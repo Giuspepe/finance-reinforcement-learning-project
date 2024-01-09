@@ -9,32 +9,22 @@ from rdpg import RDPG
 from buffer import ReplayBuffer
 from train import train
 
-
-def dim(space):
-    """Returns the dimension of a space"""  
-    if isinstance(space, gym.spaces.Discrete):
-        return space.n
-    elif isinstance(space, gym.spaces.Box):
-        return space.shape[0]
-    else:
-        raise NotImplementedError(f"Unknown space type: {space}")
-
-
 env = gym.make('CartPole-v1')
 
-rdpg = RDPG(input_dim=dim(env.observation_space), action_dim=dim(env.action_space))
+rdpg = RDPG(input_dim=4, action_dim=1)
 
+batch_size=64
 
 replay_buffer = ReplayBuffer(
-                    observation_dim=dim(env.observation_space), 
-                    action_dim=dim(env.action_space),
-                    max_episode_length=10_000,
+                    observation_dim=4, 
+                    action_dim=1,
+                    max_episode_length=100,
                     capacity=100_000,
-                    batch_size=64,
+                    batch_size=batch_size,
                             )
 
 max_timesteps = 1_000_000
-train(rdpg, env, max_timesteps, replay_buffer)
+train(rdpg, env, max_timesteps, replay_buffer, batch_size=batch_size)
 
 
 obs, _info = env.reset()

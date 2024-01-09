@@ -18,7 +18,7 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
     timestep = 0
     while timestep < max_timesteps:
         # Reset environment and agent when new episode
-        obs = env.reset()
+        obs = env.reset()[0] # [0] to get rid of info dict
         agent.reset_hidden()
         done = False
         while not done and timestep < max_timesteps:
@@ -26,13 +26,16 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
             # Select action randomly until update_after timesteps
             if timestep >= update_after:
                 action = agent.get_action(obs)
+
+                # TODO: this is dependent on the CartPole environment. Make it independent of it
+                action = 0 if action < 0.5 else 1
             else:
                 action = env.action_space.sample()
                 
-            next_obs, reward, done, _ = env.step(action)
+            next_obs, reward, done, _, _ = env.step(action)
 
             # Store experience in replay buffer
-            replay_buffer.push(obs, action, reward, next_obs, done)
+            replay_buffer.push(obs, action, reward, next_obs, done, cutoff=False)
 
             # Perform learning step
             if replay_buffer.episode_length.sum() > batch_size:
