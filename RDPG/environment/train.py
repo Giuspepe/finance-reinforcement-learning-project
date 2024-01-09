@@ -16,13 +16,14 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
     - reset_hidden(): Resets any internal state the agent may have (if applicable).
     """
     timestep = 0
+    episode = 0
     while timestep < max_timesteps:
+        print(f'Episode {episode}, timestep {timestep}/{max_timesteps}')
         # Reset environment and agent when new episode
         obs = env.reset()[0] # [0] to get rid of info dict
         agent.reset_hidden()
         done = False
-        while not done and timestep < max_timesteps:
-            
+        while not done and timestep < max_timesteps:            
             # Select action randomly until update_after timesteps
             if timestep >= update_after:
                 action = agent.get_action(obs)
@@ -44,4 +45,5 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
 
             obs = next_obs
             timestep += 1
+        episode +=1
 

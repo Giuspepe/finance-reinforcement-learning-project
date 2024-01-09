@@ -11,7 +11,7 @@ class CriticMLP(nn.Module):
         self.fc3 = nn.Linear(256, 1)
 
     def forward(self, states, actions):
-        x = F.relu(self.fc1(states))
+        x = F.relu(self.fc1(torch.cat([states, actions], dim=-1)))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x

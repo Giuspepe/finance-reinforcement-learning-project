@@ -258,21 +258,21 @@ class RDPG:
         polyak_update(self.critic_rh, self.critic_rh_target, self.tau)
         polyak_update(self.critic, self.critic_target, self.tau)
 
-        return {
-            "Q predictions": float(
-                torch.mean(preds)
-                * batch.mask
-                / batch.mask.sum()
-                * np.prod(batch.mask.shape)
-            ),
-            "Q Loss": float(critic_loss),
-            "Actor Q values": float(
-                torch.mean(Q_values)
-                * batch.mask
-                / batch.mask.sum()
-                * np.prod(batch.mask.shape)
-            ),
-        }
+        # return {
+        #     "Q predictions": float(
+        #         torch.mean(preds)
+        #         * batch.mask
+        #         / batch.mask.sum()
+        #         * np.prod(batch.mask.shape)
+        #     ),
+        #     "Q Loss": float(critic_loss),
+        #     "Actor Q values": float(
+        #         torch.mean(Q_values)
+        #         * batch.mask
+        #         / batch.mask.sum()
+        #         * np.prod(batch.mask.shape)
+        #     ),
+        # }
 
     def save_actor(self, path, name="actor"):
         """
