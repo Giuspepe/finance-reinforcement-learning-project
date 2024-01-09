@@ -4,14 +4,84 @@ import torch.optim as optim
 
 from networks.history import RecordedHistory
 from networks.actor import ActorMLP
+from buffer import RecurrentBatch
 from networks.critic import CriticMLP
 from utils import get_device, save_model, load_model, get_target_network, polyak_update
 
 
 class RDPG:
+    """
+    Recurrent Deterministic Policy Gradient (RDPG) class for reinforcement learning.
+
+    RDPG is an extension of the DDPG algorithm, incorporating recurrent neural networks 
+    (RNNs) to handle partially observable environments or environments with long-term dependencies.
+
+    Attributes:
+        input_dim (int): Dimensionality of the input space.
+        action_dim (int): Dimensionality of the action space.
+        hidden_dim (int): Size of the hidden layer in the neural networks.
+        gamma (float): Discount factor for future rewards.
+        lr (float): Learning rate for the optimizers.
+        tau (float): Coefficient for Polyak averaging in updating target networks.
+        device (torch.device): The device (CPU or GPU) to run the computations on.
+        hidden (torch.Tensor): Hidden state for the recurrent neural network.
+        
+        actor_rh (RecordedHistory): Recurrent network to process observations for the actor.
+        actor_rh_target (RecordedHistory): Target network for actor_rh.
+        actor (ActorMLP): The actor network predicting actions.
+        actor_target (ActorMLP): Target network for the actor.
+        
+        critic_rh (RecordedHistory): Recurrent network to process observations for the critic.
+        critic_rh_target (RecordedHistory): Target network for critic_rh.
+        critic (CriticMLP): The critic network estimating the value function.
+        critic_target (CriticMLP): Target network for the critic.
+        
+        actor_optimizer (torch.optim.Adam): Optimizer for the actor network.
+        actor_rh_optimizer (torch.optim.Adam): Optimizer for the actor's recorded history network.
+        critic_optimizer (torch.optim.Adam): Optimizer for the critic network.
+        critic_rh_optimizer (torch.optim.Adam): Optimizer for the critic's recorded history network.
+
+    Methods:
+        reset_hidden: Resets the hidden state of the RNNs.
+        get_action: Computes and returns the action for a given observation.
+        update: Performs a training step using a batch of data.
+        save_actor: Saves the actor model and its recorded history.
+        load_actor: Loads the actor model and its recorded history.
+
+    RDPG is well-suited for tasks where the agent's observation at a single time step does not 
+    provide full information about the environment's state (i.e., partially observable environments). 
+    The recurrent component allows the agent to maintain internal states that help in capturing 
+    information over multiple time steps.
+    """
     def __init__(
         self, input_dim, action_dim, hidden_dim=256, gamma=0.99, lr=3e-4, tau=0.995
     ):
+        """
+        Initializes the RDPG agent.
+
+        Args:
+            input_dim (int): Dimensionality of the input space.
+            action_dim (int): Dimensionality of the action space.
+            hidden_dim (int, optional): Size of the hidden layer in the neural networks. Defaults to 256.
+            gamma (float, optional): Discount factor for future rewards. Defaults to 0.99.
+            lr (float, optional): Learning rate for the optimizers. Defaults to 3e-4.
+            tau (float, optional): Coefficient for Polyak averaging in updating target networks. Defaults to 0.995.
+
+        This method initializes the RDPG agent by setting up the actor and critic networks 
+        along with their corresponding target networks. It also initializes the optimizers for 
+        these networks and sets the necessary hyperparameters.
+
+        The `input_dim` and `action_dim` parameters define the shape of the input and output 
+        for the networks. The `hidden_dim` parameter is used to determine the size of the hidden 
+        layers in the actor and critic networks.
+
+        The `gamma`, `lr`, and `tau` parameters are standard hyperparameters in reinforcement 
+        learning, controlling the discounting of future rewards, the learning rate of the 
+        optimizers, and the rate of updating the target networks, respectively.
+
+        Additionally, the agent's device is set based on the availability of GPU, and 
+        initial hidden states for the recurrent networks are set to None.
+        """
         self.input_dim = input_dim
         self.action_dim = action_dim
         self.hidden_dim = hidden_dim
@@ -47,9 +117,26 @@ class RDPG:
         self.critic_rh_optimizer = optim.Adam(self.critic_rh.parameters(), lr=self.lr)
 
     def reset_hidden(self):
+        """
+        Resets the hidden state of the RDPG agent's recurrent networks.
+
+        This is typically done at the beginning of each new episode during training or when the agent starts 
+        interacting with the environment. Clearing the hidden state is crucial for episodic tasks, as it ensures that the 
+        learning from one episode does not carry over to the next. This reset maintains the integrity of the episodic learning process, 
+        preventing information leakage between episodes.
+        """
         self.hidden = None
 
     def get_action(self, observation):
+        """
+        Computes and returns the action for a given observation using the actor network.
+
+        Args:
+            observation (array-like): The current observation from the environment.
+
+        Returns:
+            action (numpy.ndarray): The action determined by the actor network.
+        """
         with torch.no_grad():
             # Dimension of observation is (1, 1, hidden_dim)
             observation = (
@@ -64,7 +151,37 @@ class RDPG:
             action = self.actor(rh).view(-1).detach().cpu().numpy()
             return action
 
-    def update(self, batch):
+    def update(self, batch : RecurrentBatch):
+        """
+        Performs a training step using a batch of data.
+
+        Args:
+            batch (namedtuple): A batch of experiences, typically containing observations, 
+                                actions, rewards, next observations, and done flags.
+
+        This method updates both the actor and critic networks using the provided batch of 
+        experiences. It involves several key steps:
+
+        1. Processing the batch data through both the actor and critic recorded history networks
+           to generate the required inputs for the policy and value function updates.
+
+        2. Calculating the target values for the critic update using the target networks, 
+           which are more stable versions of the main networks. This is in line with the 
+           Temporal Difference (TD) learning approach and is crucial for stable training.
+
+        3. Computing the loss for the critic network based on the difference (TD error) 
+           between the predicted and target values. The loss is then backpropagated to update 
+           the critic networks.
+
+        4. Updating the actor network by maximizing the expected return, as estimated by the critic network. 
+           This involves computing a policy loss and performing backpropagation to update the actor networks.
+
+        5. Utilizing Polyak averaging to update the target networks. This step ensures that the target networks 
+           change slowly, which contributes to the overall stability of the learning process.
+
+        The method returns a dictionary containing metrics such as the critic loss and 
+        the average Q values, which can be useful for monitoring the training process.
+        """
         # Get recorded history from actor and critic
         actor_rh, _ = self.actor_rh(batch.observations)
         critic_rh, _ = self.critic_rh(batch.observations)
@@ -93,7 +210,7 @@ class RDPG:
         # This is because we want to use the target actor network to get the next state
         # This is the same as the original DDPG paper
         next_actions = self.actor(actor_rh_2_Tplus1)
-        targets = batch.rewards + self.gamma * (1 - batch.dones) * self.critic_target(
+        targets = batch.rewards + self.gamma * (1 - batch.done) * self.critic_target(
             critic_rh_2_Tplus1, next_actions
         )
 
@@ -158,9 +275,23 @@ class RDPG:
         }
 
     def save_actor(self, path, name="actor"):
+        """
+        Saves the actor model and its recorded history to the specified path.
+
+        Args:
+            path (str): The directory path where the model should be saved.
+            name (str, optional): The base name for the saved model files. Defaults to "actor".
+        """
         save_model(self.actor, path, name)
         save_model(self.actor_rh, path, name + "_rh")
 
     def load_actor(self, path, name="actor"):
+        """
+        Loads the actor model and its recorded history from the specified path.
+
+        Args:
+            path (str): The directory path from where the model should be loaded.
+            name (str, optional): The base name of the model files to be loaded. Defaults to "actor".
+        """
         self.actor = load_model(self.actor, path, name)
         self.actor_rh = load_model(self.actor_rh, path, name + "_rh")
