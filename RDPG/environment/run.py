@@ -15,7 +15,7 @@ def dim(space):
     if isinstance(space, gym.spaces.Discrete):
         return space.n
     elif isinstance(space, gym.spaces.Box):
-        return space.shape
+        return space.shape[0]
     else:
         raise NotImplementedError(f"Unknown space type: {space}")
 
