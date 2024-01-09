@@ -9,26 +9,43 @@ from rdpg import RDPG
 from buffer import ReplayBuffer
 from train import train
 
-env = gym.make('CartPole-v1')
+env = gym.make('MountainCarContinuous-v0', render_mode='human')
 
-rdpg = RDPG(input_dim=4, action_dim=1)
+rdpg = RDPG(input_dim=2, action_dim=1)
 
 batch_size=64
 
 replay_buffer = ReplayBuffer(
-                    observation_dim=4, 
+                    observation_dim=2, 
                     action_dim=1,
-                    max_episode_length=100,
+                    max_episode_length=env.spec.max_episode_steps,
                     capacity=100_000,
                     batch_size=batch_size,
                             )
 
-max_timesteps = 1_000_000
-train(rdpg, env, max_timesteps, replay_buffer, batch_size=batch_size)
+max_timesteps = 2000
+train(rdpg, env, max_timesteps, replay_buffer, batch_size=batch_size, update_after=1000)
 
 
+reward_vector = []
 obs, _info = env.reset()
 for i in range(1000):
-    action, _states = rdpg.get_action(obs)
+    action = rdpg.get_action(obs)
     obs, rewards, terminated, truncated, info = env.step(action)
+
+    reward_vector.append(rewards)
     env.render()
+    if terminated:
+        obs, _info = env.reset()
+
+env.close()
+
+# Take the average of the reward vector
+import numpy as np
+print(np.mean(reward_vector))
+
+# Plot the reward vector
+import matplotlib.pyplot as plt
+plt.plot(reward_vector)
+plt.show()
+

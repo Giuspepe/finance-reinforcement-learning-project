@@ -103,7 +103,6 @@ class ReplayBuffer():
         This function is a key part of managing the data within the buffer and ensuring that complete and valid episodes 
         are available for training the agent.
         """
-        
         # Reset and clear the data for a new episode in the replay buffer.
         if self.new_episode:
             self.observations[self.episode_pointer] = 0

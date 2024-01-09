@@ -23,6 +23,7 @@ class RDPG:
         gamma (float): Discount factor for future rewards.
         lr (float): Learning rate for the optimizers.
         tau (float): Coefficient for Polyak averaging in updating target networks.
+        action_noise (float): Standard deviation of the Gaussian noise added to the actions.
         device (torch.device): The device (CPU or GPU) to run the computations on.
         hidden (torch.Tensor): Hidden state for the recurrent neural network.
         
@@ -54,7 +55,7 @@ class RDPG:
     information over multiple time steps.
     """
     def __init__(
-        self, input_dim, action_dim, hidden_dim=256, gamma=0.99, lr=3e-4, tau=0.995
+        self, input_dim, action_dim, hidden_dim=256, gamma=0.99, lr=3e-4, tau=0.995, action_noise=0.1
     ):
         """
         Initializes the RDPG agent.
@@ -66,6 +67,7 @@ class RDPG:
             gamma (float, optional): Discount factor for future rewards. Defaults to 0.99.
             lr (float, optional): Learning rate for the optimizers. Defaults to 3e-4.
             tau (float, optional): Coefficient for Polyak averaging in updating target networks. Defaults to 0.995.
+            action_noise (float, optional): Standard deviation of the Gaussian noise added to the actions. Defaults to 0.1.
 
         This method initializes the RDPG agent by setting up the actor and critic networks 
         along with their corresponding target networks. It also initializes the optimizers for 
@@ -89,6 +91,7 @@ class RDPG:
         self.gamma = gamma
         self.lr = lr
         self.tau = tau
+        self.action_noise = action_noise
 
         self.device = get_device()
 
@@ -127,7 +130,7 @@ class RDPG:
         """
         self.hidden = None
 
-    def get_action(self, observation):
+    def get_action(self, observation, deterministic=True):
         """
         Computes and returns the action for a given observation using the actor network.
 
@@ -147,8 +150,14 @@ class RDPG:
                 .to(get_device())
             )
             rh, self.hidden = self.actor_rh(observation, self.hidden)
-            # For deterministic policy, we don't need to sample from the distribution
             action = self.actor(rh).view(-1).detach().cpu().numpy()
+
+            # For deterministic policy, we don't need to sample from the distribution
+            if deterministic:
+                return action
+            else:
+                action = np.clip(action + self.action_noise * np.random.randn(self.action_dim), -1, 1) 
+
             return action
 
     def update(self, batch : RecurrentBatch):
@@ -295,3 +304,17 @@ class RDPG:
         """
         self.actor = load_model(self.actor, path, name)
         self.actor_rh = load_model(self.actor_rh, path, name + "_rh")
+
+    def copy_network(self, rdpg):
+
+        self.actor_rh.load_state_dict(rdpg.actor_rh.state_dict())
+        self.actor_rh_target.load_state_dict(rdpg.actor_rh_target.state_dict())
+
+        self.critic_rh.load_state_dict(rdpg.critic_rh.state_dict())
+        self.critic_rh_target.load_state_dict(rdpg.critic_rh_target.state_dict())
+
+        self.actor.load_state_dict(rdpg.actor.state_dict())
+        self.actor_target.load_state_dict(rdpg.actor_target.state_dict())
+
+        self.critic.load_state_dict(rdpg.critic.state_dict())
+        self.critic_target.load_state_dict(rdpg.critic_target.state_dict())
