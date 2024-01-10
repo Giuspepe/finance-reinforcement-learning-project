@@ -17,6 +17,7 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
 
     while timestep < max_timesteps:
         obs = env.reset()  # Reset environment at the start of each episode
+        obs = obs[0]
         agent.reset_hidden()  # Reset agent's internal state
         done = False
         cutoff = False
@@ -39,7 +40,7 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
                 cutoff = False
 
             # Store experience in replay buffer
-            replay_buffer.push(obs[0], action, reward, next_obs, done, cutoff)
+            replay_buffer.push(obs, action, reward, next_obs, done, cutoff)
             
             # Update timestep and observation
             timestep += 1
