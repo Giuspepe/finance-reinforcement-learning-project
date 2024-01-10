@@ -48,7 +48,8 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
 
             # Perform learning step if enough timesteps have elapsed
             if timestep >= update_after and replay_buffer.num_episodes >= batch_size:
-                batch = replay_buffer.sample(batch_size)
+                batch = replay_buffer.sample()
+                print(f'Updating agent with batch of size {batch_size}')
                 agent.update(batch)
 
         episode += 1
