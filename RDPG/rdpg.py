@@ -7,6 +7,7 @@ from networks.actor import ActorMLP
 from buffer import RecurrentBatch
 from networks.critic import CriticMLP
 from utils import get_device, save_model, load_model, get_target_network, polyak_update
+from noise import OrnsteinUhlenbeckNoise as noise
 
 
 class RDPG:
@@ -118,6 +119,13 @@ class RDPG:
         # Critic optimizer (local and target)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.lr)
         self.critic_rh_optimizer = optim.Adam(self.critic_rh.parameters(), lr=self.lr)
+        
+        # Initialize noise
+        self.exp_mu = 0
+        self.exp_theta = 0.05
+        self.exp_sigma = 0.25
+        self.noise = noise(size=action_dim, mu=self.exp_mu, theta=self.exp_theta, sigma=self.exp_sigma)
+        
 
     def reset_hidden(self):
         """
@@ -156,7 +164,8 @@ class RDPG:
             if deterministic:
                 return action
             else:
-                action = np.clip(action + self.action_noise * np.random.randn(self.action_dim), -1, 1) 
+                noise = self.noise.sample()
+                action = action = np.clip(action*0.2 + noise, -1, 1)
 
             return action
 

@@ -11,32 +11,25 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
         max_timesteps (int): The maximum number of timesteps to train for.
         replay_buffer: A replay buffer instance for storing experiences.
         batch_size (int): The size of the batch to sample from the replay buffer for training.
-
-    The agent is expected to have the following methods:
-    - get_action(observation): Returns an action given an observation from the environment.
-    - update(batch): Updates the agent's networks using a batch of experience.
-    - reset_hidden(): Resets any internal state the agent may have (if applicable).
     """
-    agent_clone = deepcopy(agent)
-
     timestep = 0
     episode = 0
+
     while timestep < max_timesteps:
-        print(f'Episode {episode}, timestep {timestep}/{max_timesteps}')
-        # Reset environment and agent when new episode
-        obs = env.reset()[0] # [0] to get rid of info dict
-        agent.copy_network(agent_clone)
-        agent.reset_hidden()
+        obs = env.reset()  # Reset environment at the start of each episode
+        agent.reset_hidden()  # Reset agent's internal state
         done = False
         cutoff = False
+
         while not done and timestep < max_timesteps:
-            print(timestep)            
-            # Select action randomly until update_after timesteps
-            if timestep >= update_after:
-                action = agent.get_action(obs, deterministic=False)
-            else:
-                action = env.action_space.sample()
-                
+            
+            if timestep % 100 == 0:
+                print(f'Timestep {timestep}/{max_timesteps}')
+            
+            # Select action: Randomly if before update_after, otherwise use agent's action
+            action = env.action_space.sample() if timestep < update_after else agent.get_action(obs, deterministic=False)
+            
+            
             next_obs, reward, done, truncated, info = env.step(action)
 
             if replay_buffer.episode_length[replay_buffer.episode_pointer] == env.spec.max_episode_steps:
@@ -46,14 +39,18 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
                 cutoff = False
 
             # Store experience in replay buffer
-            replay_buffer.push(obs, action, reward, next_obs, done, cutoff)
+            replay_buffer.push(obs[0], action, reward, next_obs, done, cutoff)
             
-            # Perform learning step
-            if timestep > update_after:
-                batch = replay_buffer.sample()
-                agent_clone.update(batch)
-
-            obs = next_obs
+            # Update timestep and observation
             timestep += 1
-        episode +=1
+            obs = next_obs
 
+            # Perform learning step if enough timesteps have elapsed
+            if timestep >= update_after and replay_buffer.num_episodes >= batch_size:
+                batch = replay_buffer.sample(batch_size)
+                agent.update(batch)
+
+        episode += 1
+        print(f'Episode {episode} completed at timestep {timestep}/{max_timesteps}')
+    
+    print('Training completed.')

@@ -13,18 +13,18 @@ env = gym.make('MountainCarContinuous-v0', render_mode='human')
 
 rdpg = RDPG(input_dim=2, action_dim=1)
 
-batch_size=64
+batch_size=128
 
 replay_buffer = ReplayBuffer(
                     observation_dim=2, 
                     action_dim=1,
                     max_episode_length=env.spec.max_episode_steps,
-                    capacity=100_000,
+                    capacity=10_000,
                     batch_size=batch_size,
                             )
 
-max_timesteps = 2000
-train(rdpg, env, max_timesteps, replay_buffer, batch_size=batch_size, update_after=1000)
+max_timesteps = 40_000
+train(rdpg, env, max_timesteps, replay_buffer, batch_size=batch_size, update_after=2000)
 
 
 reward_vector = []
