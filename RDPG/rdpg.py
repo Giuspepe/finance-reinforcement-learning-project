@@ -262,7 +262,8 @@ class RDPG:
         critic_loss.backward()
 
         # Apply gradient clipping for critic_rh
-        torch.nn.utils.clip_grad_norm_(self.critic_rh.parameters(), max_norm=5.0)
+        critic_rh_grad_norm = torch.nn.utils.clip_grad_norm_(self.critic_rh.parameters(), max_norm=5.0)
+        
     
         self.critic_rh_optimizer.step()
         self.critic_optimizer.step()
@@ -285,7 +286,7 @@ class RDPG:
         pi_loss.backward()
 
         # Apply gradient clipping for actor_rh
-        torch.nn.utils.clip_grad_norm_(self.actor_rh.parameters(), max_norm=5.0)
+        actor_rh_grad_norm = torch.nn.utils.clip_grad_norm_(self.actor_rh.parameters(), max_norm=5.0)
   
         self.actor_rh_optimizer.step()
         self.actor_optimizer.step()
@@ -304,6 +305,8 @@ class RDPG:
             "critic_loss": critic_loss.item(),
             "average_critic_estimate": torch.mean(Q_values * batch.mask).item(),
             "actor_loss": pi_loss.item(),
+            "actor_rh_grad_norm": actor_rh_grad_norm.item(),
+            "critic_rh_grad_norm": critic_rh_grad_norm.item(),
         }
 
     def save_actor(self, path, name="actor"):

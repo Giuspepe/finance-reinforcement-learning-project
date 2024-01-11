@@ -75,6 +75,17 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
                     metrics["average_critic_estimate"],
                     timestep,
                 )
+                tb_handler.log_scalar(
+                    "Actor RNN Grad Norm", 
+                    metrics["actor_rh_grad_norm"], 
+                    timestep,
+                )
+                tb_handler.log_scalar(
+                    "Critic RNN Grad Norm",
+                    metrics["critic_rh_grad_norm"],
+                    timestep,
+                )
+                    
 
         total_reward += episode_reward
         tb_handler.log_scalar(
