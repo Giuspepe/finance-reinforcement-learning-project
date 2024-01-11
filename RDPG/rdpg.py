@@ -262,9 +262,16 @@ class RDPG:
         critic_loss.backward()
 
         # Apply gradient clipping for critic_rh
-        critic_rh_grad_norm = torch.nn.utils.clip_grad_norm_(self.critic_rh.parameters(), max_norm=5.0)
+        torch.nn.utils.clip_grad_norm_(self.critic_rh.parameters(), max_norm=5.0)
+
+        # Manually calculate the norm of gradients after clipping
+        critic_rh_grad_norm = 0
+        for param in self.critic_rh.parameters():
+            if param.grad is not None:
+                param_norm = param.grad.data.norm(2)
+                critic_rh_grad_norm += param_norm.item() ** 2
+        critic_rh_grad_norm = critic_rh_grad_norm ** 0.5
         
-    
         self.critic_rh_optimizer.step()
         self.critic_optimizer.step()
 
@@ -286,7 +293,15 @@ class RDPG:
         pi_loss.backward()
 
         # Apply gradient clipping for actor_rh
-        actor_rh_grad_norm = torch.nn.utils.clip_grad_norm_(self.actor_rh.parameters(), max_norm=5.0)
+        torch.nn.utils.clip_grad_norm_(self.actor_rh.parameters(), max_norm=5.0)
+
+        # Manually calculate the norm of gradients after clipping
+        actor_rh_grad_norm = 0
+        for param in self.critic_rh.parameters():
+            if param.grad is not None:
+                param_norm = param.grad.data.norm(2)
+                actor_rh_grad_norm += param_norm.item() ** 2
+        actor_rh_grad_norm = actor_rh_grad_norm ** 0.5
   
         self.actor_rh_optimizer.step()
         self.actor_optimizer.step()
@@ -330,6 +345,28 @@ class RDPG:
         """
         self.actor = load_model(self.actor, path, name)
         self.actor_rh = load_model(self.actor_rh, path, name + "_rh")
+
+    def save_critic(self, path, name="critic"):
+        """
+        Saves the critic model and its recorded history to the specified path.
+
+        Args:
+            path (str): The directory path where the model should be saved.
+            name (str, optional): The base name for the saved model files. Defaults to "critic".
+        """
+        save_model(self.critic, path, name)
+        save_model(self.critic_rh, path, name + "_rh")
+
+    def load_critic(self, path, name="critic"):
+        """
+        Loads the critic model and its recorded history from the specified path.
+
+        Args:
+            path (str): The directory path from where the model should be loaded.
+            name (str, optional): The base name of the model files to be loaded. Defaults to "critic".
+        """
+        self.critic = load_model(self.critic, path, name)
+        self.critic_rh = load_model(self.critic_rh, path, name + "_rh")
 
     def copy_network(self, rdpg):
         self.actor_rh.load_state_dict(rdpg.actor_rh.state_dict())

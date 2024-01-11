@@ -20,6 +20,9 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
     episode = 0
     total_reward = 0  # Added for logging
 
+    best_reward = -float('inf')  # Initialize best reward as negative infinity
+    best_episode = 0
+
     while timestep < max_timesteps:
         obs = env.reset()  # Reset environment at the start of each episode
         obs = obs[0]
@@ -91,6 +94,15 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
         tb_handler.log_scalar(
             "Reward/episode", episode_reward, episode
         )  # Log reward per episode
+
+        # Check if this episode's reward is the best and save the model
+        if episode_reward > best_reward:
+            best_reward = episode_reward
+            best_episode = episode
+            agent.save_actor("saved_models", "actor")
+            agent.save_critic("saved_models", "critic")
+            print(f"New best model saved with reward: {best_reward} at episode {best_episode}")
+
         episode += 1
         print(f"Episode {episode} completed at timestep {timestep}/{max_timesteps}")
 

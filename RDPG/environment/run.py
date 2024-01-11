@@ -14,7 +14,7 @@ env = gym.make("MountainCarContinuous-v0", render_mode="human")
 
 rdpg = RDPG(input_dim=2, action_dim=1)
 
-batch_size=32
+batch_size=64
 
 replay_buffer = ReplayBuffer(
     observation_dim=2,
@@ -24,22 +24,12 @@ replay_buffer = ReplayBuffer(
     batch_size=batch_size,
 )
 
-max_timesteps = 40_000
+max_timesteps = 200_000
 train(rdpg, env, max_timesteps, replay_buffer, batch_size=batch_size, update_after=2000)
 
+# Evaluate the best model
+reward_vector = evaluate(rdpg, env, "saved_models", "actor", num_episodes=100, max_timesteps_per_episode=1000)
 
-reward_vector = []
-obs, _info = env.reset()
-for i in range(1000):
-    action = rdpg.get_action(obs)
-    obs, rewards, terminated, truncated, info = env.step(action)
-
-    reward_vector.append(rewards)
-    env.render()
-    if terminated:
-        obs, _info = env.reset()
-
-env.close()
 
 # Take the average of the reward vector
 import numpy as np
