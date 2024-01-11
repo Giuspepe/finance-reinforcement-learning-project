@@ -251,6 +251,10 @@ class RDPG:
         self.critic_rh_optimizer.zero_grad()
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
+
+        # Apply gradient clipping for critic_rh
+        torch.nn.utils.clip_grad_norm_(self.critic_rh.parameters(), max_norm=5.0)
+    
         self.critic_rh_optimizer.step()
         self.critic_optimizer.step()
 
@@ -270,6 +274,10 @@ class RDPG:
         self.actor_rh_optimizer.zero_grad()
         self.actor_optimizer.zero_grad()
         pi_loss.backward()
+
+        # Apply gradient clipping for actor_rh
+        torch.nn.utils.clip_grad_norm_(self.actor_rh.parameters(), max_norm=5.0)
+  
         self.actor_rh_optimizer.step()
         self.actor_optimizer.step()
 
