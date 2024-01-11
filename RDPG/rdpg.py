@@ -158,6 +158,11 @@ class RDPG:
                 .to(get_device())
             )
             rh, self.hidden = self.actor_rh(observation, self.hidden)
+
+            if torch.isnan(rh).any():
+                print("ERROR: Actor RH has NaNs")
+                return np.zeros(self.action_dim)
+            
             action = self.actor(rh).view(-1).detach().cpu().numpy()
 
             # For deterministic policy, we don't need to sample from the distribution

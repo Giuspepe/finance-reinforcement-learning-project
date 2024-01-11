@@ -13,7 +13,7 @@ env = gym.make('MountainCarContinuous-v0', render_mode='human')
 
 rdpg = RDPG(input_dim=2, action_dim=1)
 
-batch_size=128
+batch_size=32
 
 replay_buffer = ReplayBuffer(
                     observation_dim=2, 
