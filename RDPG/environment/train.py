@@ -23,6 +23,8 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
     best_reward = -float('inf')  # Initialize best reward as negative infinity
     best_episode = 0
 
+    started_training = False
+
     while timestep < max_timesteps:
         obs = env.reset()  # Reset environment at the start of each episode
         obs = obs[0]
@@ -64,6 +66,9 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
 
             # Perform learning step if enough timesteps have elapsed
             if timestep >= update_after and replay_buffer.num_episodes >= batch_size:
+                if not started_training:
+                    print("Starting training...")
+                    started_training = True
                 batch = replay_buffer.sample()
                 metrics = agent.update(batch)
                 tb_handler.log_scalar("Critic Loss", metrics["critic_loss"], timestep)
@@ -89,19 +94,19 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
                     timestep,
                 )
                     
+        if started_training:
+            total_reward += episode_reward
+            tb_handler.log_scalar(
+                "Reward/episode", episode_reward, episode
+            )  # Log reward per episode
 
-        total_reward += episode_reward
-        tb_handler.log_scalar(
-            "Reward/episode", episode_reward, episode
-        )  # Log reward per episode
-
-        # Check if this episode's reward is the best and save the model
-        if episode_reward > best_reward:
-            best_reward = episode_reward
-            best_episode = episode
-            agent.save_actor("saved_models", "actor")
-            agent.save_critic("saved_models", "critic")
-            print(f"New best model saved with reward: {best_reward} at episode {best_episode}")
+            # Check if this episode's reward is the best and save the model
+            if episode_reward > best_reward:
+                best_reward = episode_reward
+                best_episode = episode
+                agent.save_actor("saved_models", "actor")
+                agent.save_critic("saved_models", "critic")
+                print(f"New best model saved with reward: {best_reward} at episode {best_episode}")
 
         episode += 1
         print(f"Episode {episode} completed at timestep {timestep}/{max_timesteps}")

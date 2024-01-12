@@ -1,5 +1,7 @@
 from rdpg import RDPG
 import gymnasium as gym
+from log import TensorBoardHandler
+
 
 def evaluate(rdpg: RDPG, env: gym.Env, path: str, name="actor", num_episodes=100, max_timesteps_per_episode=1000):
     # Initialize TensorBoardHandler
@@ -18,14 +20,16 @@ def evaluate(rdpg: RDPG, env: gym.Env, path: str, name="actor", num_episodes=100
     timestep_count = 1
     total_reward = 0
     while True:
-        action = rdpg.get_action(obs)
+        timestep_count += 1
+        action = rdpg.get_action(obs, deterministic=True)
         obs, rewards, terminated, truncated, info = env.step(action)
 
         total_reward += rewards
 
         env.render()
-        if terminated:
+        if terminated or timestep_count > max_timesteps_per_episode:
             obs, _info = env.reset()
+            timestep_count = 1
             episode_reward_vector.append(total_reward)
             tb_handler.log_scalar(
                 "Reward/episode", total_reward, episode_count
@@ -35,9 +39,6 @@ def evaluate(rdpg: RDPG, env: gym.Env, path: str, name="actor", num_episodes=100
             if episode_count > num_episodes:
                 break
         
-        timestep_count += 1
-        if timestep_count > max_timesteps_per_episode:
-            break
 
     env.close()
 

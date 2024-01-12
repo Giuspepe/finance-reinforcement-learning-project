@@ -9,6 +9,7 @@ from networks.critic import CriticMLP
 from utils import get_device, save_model, load_model, get_target_network, polyak_update
 from noise import OrnsteinUhlenbeckNoise as noise
 
+torch.autograd.set_detect_anomaly(True)
 
 class RDPG:
     """
@@ -65,6 +66,8 @@ class RDPG:
         lr=3e-4,
         tau=0.995,
         action_noise=0.1,
+        upper_normalization_bounds=None,
+        lower_normalization_bounds=None,
     ):
         """
         Initializes the RDPG agent.
@@ -104,18 +107,25 @@ class RDPG:
 
         self.device = get_device()
 
+        self.upper_normalization_bounds = torch.tensor(upper_normalization_bounds, dtype=torch.float32).to(
+            self.device
+        )
+        self.lower_normalization_bounds = torch.tensor(lower_normalization_bounds, dtype=torch.float32).to(
+            self.device
+        )
+
         self.hidden = None
 
         # rh = recorded history
 
         # Actor networks (local and target)
-        self.actor_rh = RecordedHistory(input_dim, hidden_dim).to(self.device)
+        self.actor_rh = RecordedHistory(input_dim, hidden_dim, 2, self.upper_normalization_bounds, self.lower_normalization_bounds).to(self.device)
         self.actor_rh_target = get_target_network(self.actor_rh)
         self.actor = ActorMLP(hidden_dim, action_dim).to(self.device)
         self.actor_target = get_target_network(self.actor)
 
         # Critic networks (local and target)
-        self.critic_rh = RecordedHistory(input_dim, hidden_dim).to(self.device)
+        self.critic_rh = RecordedHistory(input_dim, hidden_dim, 2, self.upper_normalization_bounds, self.lower_normalization_bounds).to(self.device)
         self.critic_rh_target = get_target_network(self.critic_rh)
         self.critic = CriticMLP(hidden_dim, action_dim).to(self.device)
         self.critic_target = get_target_network(self.critic)
@@ -262,7 +272,7 @@ class RDPG:
         critic_loss.backward()
 
         # Apply gradient clipping for critic_rh
-        torch.nn.utils.clip_grad_norm_(self.critic_rh.parameters(), max_norm=5.0)
+        torch.nn.utils.clip_grad_norm_(self.critic_rh.parameters(), max_norm=10.0)
 
         # Manually calculate the norm of gradients after clipping
         critic_rh_grad_norm = 0
@@ -293,7 +303,7 @@ class RDPG:
         pi_loss.backward()
 
         # Apply gradient clipping for actor_rh
-        torch.nn.utils.clip_grad_norm_(self.actor_rh.parameters(), max_norm=5.0)
+        torch.nn.utils.clip_grad_norm_(self.actor_rh.parameters(), max_norm=10.0)
 
         # Manually calculate the norm of gradients after clipping
         actor_rh_grad_norm = 0
@@ -314,14 +324,27 @@ class RDPG:
         polyak_update(self.critic_rh, self.critic_rh_target, self.tau)
         polyak_update(self.critic, self.critic_target, self.tau)
 
+        # Check if any named parameters have NaN values
+        # This is useful for debugging
+        for name, param in self.actor_rh.named_parameters():
+            if torch.isnan(param).any():
+                print("ERROR: Actor RH has NaNs")
+                return
+        
+        for name, param in self.critic_rh.named_parameters():
+            if torch.isnan(param).any():
+                print("ERROR: Critic RH has NaNs")
+                return
+
+
         # Return metrics for logging
         return {
             "mean_critic_predictions": torch.mean(preds * batch.mask).item(),
             "critic_loss": critic_loss.item(),
             "average_critic_estimate": torch.mean(Q_values * batch.mask).item(),
             "actor_loss": pi_loss.item(),
-            "actor_rh_grad_norm": actor_rh_grad_norm.item(),
-            "critic_rh_grad_norm": critic_rh_grad_norm.item(),
+            "actor_rh_grad_norm": actor_rh_grad_norm,
+            "critic_rh_grad_norm": critic_rh_grad_norm,
         }
 
     def save_actor(self, path, name="actor"):
