@@ -64,8 +64,9 @@ class RDPG:
         hidden_dim=256,
         gamma=0.99,
         lr=3e-4,
-        tau=0.995,
-        action_noise=0.1,
+        tau=0.005,
+        action_noise=1.0,
+        action_noise_decay_steps=200000,
         upper_normalization_bounds=None,
         lower_normalization_bounds=None,
     ):
@@ -78,7 +79,7 @@ class RDPG:
             hidden_dim (int, optional): Size of the hidden layer in the neural networks. Defaults to 256.
             gamma (float, optional): Discount factor for future rewards. Defaults to 0.99.
             lr (float, optional): Learning rate for the optimizers. Defaults to 3e-4.
-            tau (float, optional): Coefficient for Polyak averaging in updating target networks. Defaults to 0.995.
+            tau (float, optional): Coefficient for Polyak averaging in updating target networks. Defaults to 0.005.
             action_noise (float, optional): Standard deviation of the Gaussian noise added to the actions. Defaults to 0.1.
 
         This method initializes the RDPG agent by setting up the actor and critic networks
@@ -104,6 +105,7 @@ class RDPG:
         self.lr = lr
         self.tau = tau
         self.action_noise = action_noise
+        self.action_noise_decay_steps = action_noise_decay_steps
 
         self.device = get_device()
 
@@ -146,6 +148,8 @@ class RDPG:
             size=action_dim, mu=self.exp_mu, theta=self.exp_theta, sigma=self.exp_sigma
         )
 
+        self.decay_action = self.action_noise/float(self.action_noise_decay_steps)
+
     def reset_hidden(self):
         """
         Resets the hidden state of the RDPG agent's recurrent networks.
@@ -184,13 +188,14 @@ class RDPG:
             
             action = self.actor(rh).view(-1).detach().cpu().numpy()
 
+            print(action)
             # For deterministic policy, we don't need to sample from the distribution
             if deterministic:
                 return action
             else:
                 noise = self.noise.sample()
-                action = action = np.clip(action * 0.2 + noise, -1, 1)
-
+                action = np.clip(action + noise*max(self.action_noise, 0), -1, 1)
+                self.action_noise -= self.decay_action
             return action
 
     def update(self, batch: RecurrentBatch):

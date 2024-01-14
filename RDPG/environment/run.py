@@ -12,20 +12,22 @@ from train import train
 from evaluate import evaluate
 env = gym.make("MountainCarContinuous-v0", render_mode="human")
 
-rdpg = RDPG(input_dim=2, action_dim=1, lr=3e-4, upper_normalization_bounds=env.observation_space.high, lower_normalization_bounds=env.observation_space.low)
+UPDATE_AFTER = 30000
+MAX_TIMESTEPS = 200000
 
-# batch_size=32
+rdpg = RDPG(input_dim=2, action_dim=1, lr=3e-4, upper_normalization_bounds=env.observation_space.high, lower_normalization_bounds=env.observation_space.low, action_noise_decay_steps=MAX_TIMESTEPS-UPDATE_AFTER)
 
-# replay_buffer = ReplayBuffer(
-#     observation_dim=2,
-#     action_dim=1,
-#     max_episode_length=env.spec.max_episode_steps,
-#     capacity=10_000,
-#     batch_size=batch_size,
-# )
+batch_size=64
 
-# max_timesteps = 150_000
-# train(rdpg, env, max_timesteps, replay_buffer, batch_size=batch_size, update_after=5000)
+replay_buffer = ReplayBuffer(
+    observation_dim=2,
+    action_dim=1,
+    max_episode_length=env.spec.max_episode_steps,
+    capacity=2_000,
+    batch_size=batch_size,
+)
+
+train(rdpg, env, MAX_TIMESTEPS, replay_buffer, batch_size=batch_size, update_after=UPDATE_AFTER)
 
 # Evaluate the best model
 reward_vector = evaluate(rdpg, env, "saved_models", "actor", num_episodes=100, max_timesteps_per_episode=1000)

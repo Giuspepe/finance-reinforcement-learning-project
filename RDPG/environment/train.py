@@ -32,15 +32,16 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
         done = False
         cutoff = False
         episode_reward = 0  # Added for logging
-
-        while not done and timestep < max_timesteps:
+        
+        done_or_cutoff = done or cutoff
+        while not done_or_cutoff and timestep < max_timesteps:
             if timestep % 100 == 0:
                 print(f"Timestep {timestep}/{max_timesteps}")
 
-            # Select action: Randomly if before update_after, otherwise use agent's action
+            # Select action: Randomly if before update_after and not started training, otherwise use agent's action
             action = (
                 env.action_space.sample()
-                if timestep < update_after
+                if timestep < update_after and not started_training
                 else agent.get_action(obs, deterministic=False)
             )
 
@@ -64,12 +65,13 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
             timestep += 1
             obs = next_obs
 
-            # Perform learning step if enough timesteps have elapsed
-            if timestep >= update_after and replay_buffer.num_episodes >= batch_size:
+            # Perform learning step if enough timesteps have elapsed or batch is full
+            if timestep >= update_after or replay_buffer.num_episodes >= batch_size:
                 if not started_training:
                     print("Starting training...")
                     started_training = True
                 batch = replay_buffer.sample()
+                agent.action_noise_decay_steps = max_timesteps - timestep
                 metrics = agent.update(batch)
                 tb_handler.log_scalar("Critic Loss", metrics["critic_loss"], timestep)
                 tb_handler.log_scalar("Actor Loss", metrics["actor_loss"], timestep)
@@ -93,6 +95,8 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
                     metrics["critic_rh_grad_norm"],
                     timestep,
                 )
+
+            done_or_cutoff = done or cutoff
                     
         if started_training:
             total_reward += episode_reward
@@ -104,13 +108,21 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
             if episode_reward > best_reward:
                 best_reward = episode_reward
                 best_episode = episode
-                agent.save_actor("saved_models", "actor")
-                agent.save_critic("saved_models", "critic")
+                agent.save_actor("saved_models", "actor_best")
+                agent.save_critic("saved_models", "critic_best")
+                
                 print(f"New best model saved with reward: {best_reward} at episode {best_episode}")
 
         episode += 1
         print(f"Episode {episode} completed at timestep {timestep}/{max_timesteps}")
 
+        # Every 20 episodes, save the model to last
+        if episode % 20 == 0:
+            agent.save_actor("saved_models", "actor_last")
+            agent.save_critic("saved_models", "critic_last")
+
     tb_handler.log_scalar("Total Reward", total_reward, episode)  # Log total reward
     tb_handler.close()  # Close the TensorBoard handler
+    agent.save_actor("saved_models", "actor_last")
+    agent.save_critic("saved_models", "critic_last")
     print("Training completed.")

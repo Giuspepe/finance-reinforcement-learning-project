@@ -161,3 +161,9 @@ cython_debug/
 
 # Custom
 runs/ 
+saved_models/
+tacr_experiment_data/
+.pkl
+*.pth
+*.pt
+*.pkl
