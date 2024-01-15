@@ -46,30 +46,28 @@ class Trainer:
             = [], [], [], [], [], [], [], [], [], [], []
         for i in range(batch_size):
             traj = self.agent.config.trajectories[int(batch_inds[i])]
-            si = random.randint(0, traj['rewards'].shape[0] - 1)
+            si = random.randint(0, traj.rewards.shape[0] - 1)
             
             # Get sequences from dataset
-            s.append(traj['observations'][si:si + lookback].reshape(1, -1, self.agent.config.state_dim))
-            a.append(traj['actions'][si:si + lookback].reshape(1, -1, self.agent.config.action_dim))
-            r.append(traj['rewards'][si:si + lookback].reshape(1, -1, 1))
-            dd.append(traj['dones'][si:si + lookback].reshape(1, -1, 1))
+            s.append(traj.observations[si:si + lookback].reshape(1, -1, self.agent.config.state_dim))
+            a.append(traj.actions[si:si + lookback].reshape(1, -1, self.agent.config.action_dim))
+            r.append(traj.rewards[si:si + lookback].reshape(1, -1, 1))
+            dd.append(traj.dones[si:si + lookback].reshape(1, -1, 1))
 
-            if si >= traj['rewards'].shape[0] - lookback:
-                next_s.append(np.append(traj['observations'][si + 1:si + 1 + lookback],
-                                        traj['observations'][traj['rewards'].shape[0] - 1]).reshape(1, -1, self.agent.config.state_dim))
-                next_a.append(np.append(traj['actions'][si + 1:si + 1 + lookback],
-                                        traj['actions'][traj['rewards'].shape[0] - 1]).reshape(1, -1, self.agent.config.action_dim))
-                next_r.append(np.append(traj['rewards'][si + 1:si + 1 + lookback],
-                                        np.array([traj['rewards'][traj['rewards'].shape[0] - 1]])).reshape(1, -1, 1))
+            if si >= traj.rewards.shape[0] - lookback:
+                next_s.append(np.append(traj.observations[si + 1:si + 1 + lookback],
+                                        traj.observations[traj.rewards.shape[0] - 1]).reshape(1, -1, self.agent.config.state_dim))
+                next_a.append(np.append(traj.actions[si + 1:si + 1 + lookback],
+                                        traj.actions[traj.rewards.shape[0] - 1]).reshape(1, -1, self.agent.config.action_dim))
+                next_r.append(np.append(traj.rewards[si + 1:si + 1 + lookback],
+                                        np.array([traj.rewards[traj.rewards.shape[0] - 1]])).reshape(1, -1, 1))
             else:
-                next_s.append(traj['observations'][si + 1:si + 1 + lookback].reshape(1, -1, self.agent.config.state_dim))
-                next_a.append(traj['actions'][si + 1:si + 1 + lookback].reshape(1, -1, self.agent.config.action_dim))
-                next_r.append(traj['rewards'][si + 1:si + 1 + lookback].reshape(1, -1, 1))
+                next_s.append(traj.observations[si + 1:si + 1 + lookback].reshape(1, -1, self.agent.config.state_dim))
+                next_a.append(traj.actions[si + 1:si + 1 + lookback].reshape(1, -1, self.agent.config.action_dim))
+                next_r.append(traj.rewards[si + 1:si + 1 + lookback].reshape(1, -1, 1))
 
-            if 'terminals' in traj:
-                d.append(traj['terminals'][si:si + lookback].reshape(1, -1))
-            else:
-                d.append(traj['dones'][si:si + lookback].reshape(1, -1))
+
+            d.append(traj.dones[si:si + lookback].reshape(1, -1))
 
             timesteps.append(np.arange(si, si + s[-1].shape[1]).reshape(1, -1))
             timesteps[-1][timesteps[-1] >= self.agent.config.max_episode_length] = self.agent.config.max_episode_length - 1  # padding cutoff
@@ -106,7 +104,7 @@ class Trainer:
             states=s,
             actions=a,
             rewards=r,
-            dones=d,
+            dones=dd,
             next_state=next_s,
             next_actions=next_a,
             next_rewards=next_r,

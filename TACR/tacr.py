@@ -29,6 +29,7 @@ class TACR:
             max_length=self.config.lookback,
             max_episode_length=self.config.max_episode_length,
             action_softmax=self.config.action_softmax,
+            action_softmax_dim=self.config.action_softmax_dim
         ).to(self.device)
         self.actor_target = get_target_network(self.actor)
 
@@ -57,7 +58,7 @@ class TACR:
         next_timesteps = torch.tensor(batch.next_timesteps, dtype=torch.long).to(self.device)
         rewards = torch.tensor(batch.rewards, dtype=torch.float32).to(self.device)
         next_rewards = torch.tensor(batch.next_rewards, dtype=torch.float32).to(self.device)
-        dones = torch.tensor(batch.dones, dtype=torch.bool).to(self.device)
+        dones = torch.tensor(batch.dones, dtype=torch.float32).to(self.device)
         next_actions = torch.tensor(batch.next_actions, dtype=torch.float32).to(self.device)
         attention_mask = torch.tensor(batch.attention_mask, dtype=torch.long).to(self.device)
 
@@ -144,7 +145,6 @@ class TACR:
             name (str, optional): The base name for the saved model files. Defaults to "critic".
         """
         save_model(self.critic, path, name)
-        save_model(self.critic_rh, path, name + "_rh")
 
     def load_critic(self, path, name="critic"):
         """

@@ -6,7 +6,7 @@ import transformers
 from .gpt2 import GPT2Model
 
 class Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_size, max_length=None, max_episode_length=8192, action_softmax=True):
+    def __init__(self, state_dim, action_dim, hidden_size, max_length=None, max_episode_length=8192, action_softmax=True, action_softmax_dim=2):
         super(Actor, self).__init__()
 
         # Store arguments as object attributes
@@ -16,6 +16,7 @@ class Actor(nn.Module):
         self.max_length = max_length
         self.max_episode_length = max_episode_length
         self.action_softmax = action_softmax
+        self.action_softmax_dim = action_softmax_dim
 
         # Configure GPT2 with the number of embeddings equal to the hidden size and vocab_size=1 since we don't use the vocabulary
         config = transformers.GPT2Config(
@@ -46,7 +47,7 @@ class Actor(nn.Module):
             # Create a Linear Layer followed by a Softmax to predict actions
             self.action_prediction_layer = nn.Sequential(
                 nn.Linear(self.hidden_size, self.action_dim),
-                nn.Softmax(dim=2)
+                nn.Softmax(dim=self.action_softmax_dim)
             )
         else:
             self.action_prediction_layer = nn.Linear(self.hidden_size, self.action_dim) 
@@ -138,4 +139,4 @@ class Actor(nn.Module):
 
         action_preds = self.forward( states, actions, rewards, timesteps, attention_mask=attention_mask)
 
-        return action_preds[0,-1]
+        return action_preds[0, -1]
