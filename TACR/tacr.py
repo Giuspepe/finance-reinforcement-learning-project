@@ -15,9 +15,12 @@ import torch.nn.functional as F
 
 
 class TACR:
-    def __init__(self, config: TACRConfig):
+    def __init__(self, config: TACRConfig, load_file_config=False, file_config_path=None, file_config_name=None):
         # Configuration for TACR
-        self.config = config
+        if load_file_config:
+            self.load_config(file_config_path, file_config_name)
+        else:
+            self.config = config
 
         self.device = get_device()
 
@@ -51,16 +54,16 @@ class TACR:
 
     # From a random minibatch, update the models
     def update(self, batch: Batch):
-        states = torch.tensor(batch.states, dtype=torch.float32).to(self.device)
-        next_state = torch.tensor(batch.next_state, dtype=torch.float32).to(self.device)
-        actions = torch.tensor(batch.actions, dtype=torch.float32).to(self.device)
-        timesteps = torch.tensor(batch.timesteps, dtype=torch.long).to(self.device)
-        next_timesteps = torch.tensor(batch.next_timesteps, dtype=torch.long).to(self.device)
-        rewards = torch.tensor(batch.rewards, dtype=torch.float32).to(self.device)
-        next_rewards = torch.tensor(batch.next_rewards, dtype=torch.float32).to(self.device)
-        dones = torch.tensor(batch.dones, dtype=torch.float32).to(self.device)
-        next_actions = torch.tensor(batch.next_actions, dtype=torch.float32).to(self.device)
-        attention_mask = torch.tensor(batch.attention_mask, dtype=torch.long).to(self.device)
+        states = batch.states.clone().detach().to(self.device)
+        next_state = batch.next_state.clone().detach().to(self.device)
+        actions = batch.actions.clone().detach().to(self.device)
+        timesteps = batch.timesteps.clone().detach().to(self.device)
+        next_timesteps = batch.next_timesteps.clone().detach().to(self.device)
+        rewards = batch.rewards.clone().detach().to(self.device)
+        next_rewards = batch.next_rewards.clone().detach().to(self.device)
+        dones = batch.dones.clone().detach().to(self.device)
+        next_actions = batch.next_actions.clone().detach().to(self.device)
+        attention_mask = batch.attention_mask.clone().detach().to(self.device)
 
         # Predict the action from the 
         action_preds = self.actor.forward(
@@ -81,7 +84,7 @@ class TACR:
 
         # Compute the target Q value
         target_Q = self.critic_target(next_state, next_Q_action_preds)
-        target_Q = rewards + (dones * self.config.gamma * target_Q).detach()
+        target_Q = rewards + ((1-dones) * self.config.gamma * target_Q).detach()
         # Get current Q estimates
         current_Q = self.critic(states, action_sample)
         # Compute critic loss
@@ -111,9 +114,14 @@ class TACR:
 
         polyak_update(self.critic, self.critic_target, self.config.tau)
 
-        return actor_loss.detach().cpu().item()
-        
 
+        metrics = {
+            "critic_loss": critic_loss.detach().cpu().item(),
+            "actor_loss": actor_loss.detach().cpu().item(),
+            "mean_critic_predictions": Q.mean().detach().cpu().item(),
+            "average_critic_estimate": current_Q.mean().detach().cpu().item(),
+        }
+        return metrics
 
     def save_actor(self, path, name="actor"):
         """
@@ -156,3 +164,34 @@ class TACR:
         """
         self.critic = load_model(self.critic, path, name)
         self.critic_target = get_target_network(self.critic)
+
+    def save_config(self, path, name="config"):
+        """
+        Saves the TACRConfig to the specified path.
+
+        Args:
+            path (str): The directory path where the config should be saved.
+            name (str, optional): The base name for the saved config file. Defaults to "config".
+        """
+        import pickle
+
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        with open(os.path.join(path, f"{name}.pkl"), "wb") as f:
+            pickle.dump(self.config, f)
+
+    def load_config(self, path, name="config"):
+        """
+        Loads the TACRConfig from the specified path.
+
+        Args:
+            path (str): The directory path from where the config should be loaded.
+            name (str, optional): The base name of the config file to be loaded. Defaults to "config".
+        """
+        import pickle
+
+        with open(os.path.join(path, f"{name}.pkl"), "rb") as f:
+            self.config = pickle.load(f)
+
+    

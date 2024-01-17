@@ -256,7 +256,7 @@ class RDPG:
         # Note that we use the target actor network to get the actions
         # This is because we want to use the target actor network to get the next state
         # This is the same as the original DDPG paper
-        next_actions = self.actor(actor_rh_2_Tplus1)
+        next_actions = self.actor_target(actor_rh_2_Tplus1)
         targets = batch.rewards + self.gamma * (1 - batch.done) * self.critic_target(
             critic_rh_2_Tplus1, next_actions
         )

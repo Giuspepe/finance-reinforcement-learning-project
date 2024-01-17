@@ -37,9 +37,10 @@ class TrajectoryGenerator:
         trajectory = UnfinishedTrajectory()
         observation = self.env.reset()
         observation = observation[0]
+        step=0
         while True:
             if self.action_generator_func:
-                action = self.action_generator_func()
+                action = self.action_generator_func(observation=observation, step=step, env=self.env)
             else:
                 action = self.env.action_space.sample()
 
@@ -55,6 +56,7 @@ class TrajectoryGenerator:
 
             if done_or_truncated: 
                 break
+            step+=1
 
         finished_trajectory = Trajectory(trajectory.observations, trajectory.rewards, trajectory.dones, trajectory.actions)
             

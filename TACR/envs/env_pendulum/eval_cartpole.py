@@ -14,19 +14,24 @@ import gymnasium as gym
 import torch    
 
 
-def evaluate(tacr: TACR, env: gym.Env, path: str, name="actor", num_episodes=100, max_timesteps_per_episode=1000, state_mean=0.0, state_std=1.0, state_dim: int = 2, action_dim: int = 1):
+def evaluate(path: str, name_actor="actor", name_config="config", num_episodes=100, max_timesteps_per_episode=1000, silence=True):
+    env = gym.make("CartPole-v1", render_mode="human")
 
+    # Prepare TACR
+    tacr_config = TACRConfig()
+    tacr = TACR(config=tacr_config, load_file_config=True, file_config_path=path, file_config_name=name_config)
+             
     # Load Actor Model
-    tacr.load_actor(path, name)
+    tacr.load_actor(path, name_actor)
 
     tacr.actor.eval()
 
-    # Generate state_mean and state_std using the same dimensions as states, so that we can normalize the states, from state_dim
-    state_mean = np.array([state_mean for _ in range(state_dim)])
-    state_std = np.array([state_std for _ in range(state_dim)])
+    # Get state mean and std
+    state_mean = tacr.config.state_mean
+    state_std = tacr.config.state_std
 
-    state_mean = torch.from_numpy(state_mean).to(device=tacr.device)
-    state_std = torch.from_numpy(state_std).to(device=tacr.device)
+    state_dim = tacr.config.state_dim
+    action_dim = tacr.config.action_dim
 
     episode_reward_vector = []
     obs, _info = env.reset()
@@ -34,7 +39,8 @@ def evaluate(tacr: TACR, env: gym.Env, path: str, name="actor", num_episodes=100
 
     # Keep all histories on device
     # Latest action and Reward will be "padding"
-    states = torch.from_numpy(obs).reshape(1, state_dim).to(device=tacr.device, dtype=torch.float32)
+
+    states = torch.from_numpy((obs - state_mean) / state_std).reshape(1, state_dim).to(device=tacr.device, dtype=torch.float32)
     actions = torch.zeros((0, action_dim), device=tacr.device, dtype=torch.float32)
     rewards = torch.zeros(0, device=tacr.device, dtype=torch.float32)
     timesteps = torch.tensor(0, device=tacr.device, dtype=torch.long).reshape(1, 1)
@@ -50,7 +56,7 @@ def evaluate(tacr: TACR, env: gym.Env, path: str, name="actor", num_episodes=100
         rewards = torch.cat([rewards, torch.zeros(1, device=tacr.device)])
 
         action = tacr.actor.get_action(
-            (states.to(dtype=torch.float32) - state_mean) / state_std,
+            states.to(dtype=torch.float32),
             actions.to(dtype=torch.float32),
             rewards.to(dtype=torch.float32),
             timesteps.to(dtype=torch.long),
@@ -79,8 +85,8 @@ def evaluate(tacr: TACR, env: gym.Env, path: str, name="actor", num_episodes=100
             obs, _info = env.reset()
             timestep_count = 1
             episode_reward_vector.append(total_reward)
-
-            print(f"Episode {episode_count} reward: {total_reward}")
+            if not silence:
+                print(f"Episode {episode_count} reward: {total_reward}")
             total_reward = 0
 
             # Reset history for the episode
@@ -95,19 +101,16 @@ def evaluate(tacr: TACR, env: gym.Env, path: str, name="actor", num_episodes=100
         
 
     env.close()
-    
-    return episode_reward_vector
+    avg_reward = np.mean(episode_reward_vector)
 
-env = gym.make("MountainCar-v0", render_mode="human")
-action_dim = env.action_space.n
-tacr_config = TACRConfig(state_dim=env.observation_space.shape[0], action_dim=action_dim, action_softmax=True)
-agent = TACR(config=tacr_config)
+    return episode_reward_vector, avg_reward
 
-episode_reward_vector = evaluate(agent, env, "saved_models_tacr", "actor", num_episodes=100, max_timesteps_per_episode=1000, state_mean=0.0, state_std=1.0, state_dim=env.observation_space.shape[0], action_dim=action_dim)
+if __name__ == "__main__":
+    episode_reward_vector, avg_reward = evaluate("saved_models_tacr", "actor_best", "config_best", num_episodes=100, max_timesteps_per_episode=1000, silence=False)
 
-avg_reward = np.mean(episode_reward_vector)
 
-print(f"Average reward: {avg_reward}")
+    print(f"Average reward: {avg_reward}")
 
-import matplotlib.pyplot as plt
-plt.plot(episode_reward_vector)
+    import matplotlib.pyplot as plt
+    plt.plot(episode_reward_vector)
+
