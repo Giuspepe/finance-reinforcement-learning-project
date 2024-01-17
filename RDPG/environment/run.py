@@ -43,3 +43,6 @@ import matplotlib.pyplot as plt
 
 plt.plot(reward_vector)
 plt.show()
+
+avgreward = np.mean(reward_vector)
+print(avgreward)
