@@ -69,15 +69,42 @@ class TrajectoryGenerator:
             print(f"Generated trajectory {i+1}/{self.number_of_trajectories}")
 
         if save_file:
-            if not os.path.exists("tacr_experiment_data"):
-                os.makedirs("tacr_experiment_data")
-
-            name = f'{"tacr_experiment_data/"+name_file}'
-            with open(f'{name}.pkl', 'wb') as f:
-                pickle.dump(trajectories, f)
+            self.save_file(trajectories, name_file)
 
         return trajectories
+    
+    def save_file(self, trajectories: List[Trajectory], name_file: str = "trajs"):
+        if not os.path.exists("tacr_experiment_data"):
+            os.makedirs("tacr_experiment_data")
+
+        name = f'{"tacr_experiment_data/"+name_file}'
+        with open(f'{name}.pkl', 'wb') as f:
+            pickle.dump(trajectories, f)
         
+    def generate_trajectory_from_predefined_list_of_actions(self, actions: List[Any]) -> Trajectory:
+        trajectory = UnfinishedTrajectory()
+        observation = self.env.reset()
+        observation = observation[0]
+        step=0
+        for action in actions:
+            if self.action_picker_func:
+                picked_action = self.action_picker_func(action)
+            else:
+                picked_action = action
+
+            next_observation, reward, done, truncated, info = self.env.step(picked_action)
+            done_or_truncated = done or truncated
+            trajectory.append_observation(np.array(observation), reward, done_or_truncated, action)
+            print(f"Step {step+1}/{len(actions)}, acc_value: {self.env.account_value}, cash_in_hand: {self.env.cash_in_hand}, shares_held: {self.env.shares_held}, price: {self.env.price_array[self.env.day]}, action: {action}")
+            observation = next_observation
+
+            if done_or_truncated: 
+                break
+            step+=1
+
+        finished_trajectory = Trajectory(trajectory.observations, trajectory.rewards, trajectory.dones, trajectory.actions)
+            
+        return finished_trajectory
 
 
 

@@ -25,6 +25,18 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
 
     started_training = False
 
+    max_ep_steps = 0
+    if hasattr(env, "spec"):
+        if hasattr(env.spec, "max_episode_steps"):
+            max_ep_steps = env.spec.max_episode_steps
+    if hasattr(env, "max_episode_steps"):
+        max_ep_steps = env.max_episode_steps
+
+    if max_ep_steps == 0:
+        raise ValueError(
+            "Environment must have a 'env.spec.max_episode_steps' or 'env.max_episode_steps' attribute"
+        )
+
     while timestep < max_timesteps:
         obs = env.reset()  # Reset environment at the start of each episode
         obs = obs[0]
@@ -49,9 +61,10 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
 
             episode_reward += reward  # Added for logging
 
+            
             if (
                 replay_buffer.episode_length[replay_buffer.episode_pointer]
-                == env.spec.max_episode_steps
+                == max_ep_steps
             ):
                 cutoff = truncated
                 done = False if cutoff else True
@@ -108,8 +121,8 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
             if episode_reward > best_reward:
                 best_reward = episode_reward
                 best_episode = episode
-                agent.save_actor("saved_models", "actor_best")
-                agent.save_critic("saved_models", "critic_best")
+                agent.save_actor("saved_models_rdpg", "actor_best")
+                agent.save_critic("saved_models_rdpg", "critic_best")
                 
                 print(f"New best model saved with reward: {best_reward} at episode {best_episode}")
 
@@ -118,11 +131,11 @@ def train(agent, env, max_timesteps, replay_buffer, batch_size, update_after=0):
 
         # Every 20 episodes, save the model to last
         if episode % 20 == 0:
-            agent.save_actor("saved_models", "actor_last")
-            agent.save_critic("saved_models", "critic_last")
+            agent.save_actor("saved_models_rdpg", "actor_last")
+            agent.save_critic("saved_models_rdpg", "critic_last")
 
     tb_handler.log_scalar("Total Reward", total_reward, episode)  # Log total reward
     tb_handler.close()  # Close the TensorBoard handler
-    agent.save_actor("saved_models", "actor_last")
-    agent.save_critic("saved_models", "critic_last")
+    agent.save_actor("saved_models_rdpg", "actor_last")
+    agent.save_critic("saved_models_rdpg", "critic_last")
     print("Training completed.")
