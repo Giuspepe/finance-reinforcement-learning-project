@@ -15,17 +15,37 @@ import torch
 import random
 from TACR.utils.log import TensorBoardHandler
 
-
 class Trainer:
     def __init__(
         self, agent: TACR, env: gymnasium.Env
     ):
+        """
+        Initialize the Trainer object.
+
+        Parameters:
+        - agent (TACR): The agent to be trained.
+        - env (gymnasium.Env): The environment in which the agent will be trained.
+
+        This class is responsible for training an agent in a specified environment. It handles the training iterations,
+        logging, and batch generation.
+        """
         self.agent = agent
         self.env = env
         self.total_it = 0
         self.tb = TensorBoardHandler()
 
     def train_it(self, num_steps: int):
+        """
+        Train the agent for a specified number of steps.
+
+        Parameters:
+        - num_steps (int): Number of training steps to perform.
+
+        Returns:
+        - dict: A dictionary containing training metrics.
+
+        This method performs training iterations, updates the agent, and logs metrics to TensorBoard.
+        """
         train_metrics = {
             "critic_loss": [],
             "actor_loss": [],
@@ -69,10 +89,27 @@ class Trainer:
 
 
     def finish_training(self):
+        """
+        Close the TensorBoard handler after training.
+
+        This method should be called after training to properly close the TensorBoard logging resources.
+        """
         self.tb.close()
 
     def get_batch(self, batch_size: int, lookback: int) -> Batch:
+        """
+        Generate a batch of data for training.
 
+        Parameters:
+        - batch_size (int): Size of the batch to generate.
+        - lookback (int): Number of past states to include in the batch.
+
+        Returns:
+        - Batch: A batch of data for training.
+
+        This method creates a batch of data by sampling from the training trajectories. It handles state normalization,
+        action padding, and timestep handling for the batch.
+        """
         batch_inds = np.random.choice(
             np.arange(len(self.agent.config.train_traj_lenghts)),
             size=batch_size,
@@ -233,7 +270,8 @@ class Trainer:
         mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(
             device=self.agent.device
         )
-
+        
+        # Convert the collected data into tensors and return as a Batch object
         batch = Batch(
             states=s,
             actions=a,

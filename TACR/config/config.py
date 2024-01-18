@@ -2,13 +2,11 @@ from typing import List
 
 from TACR.trajectory.trajectory import Trajectory
 
-
 class TACRConfig:
     def __init__(
         self,
         lookback: int = 20,
         alpha: float = 0.9,
-        pct_traj: float = 1.0,
         batch_size: int = 64,
         embed_dim: int = 128,
         critic_lr: float = 1e-6,
@@ -32,9 +30,40 @@ class TACRConfig:
         state_mean: float = 0.0,
         state_std: float = 1.0,
     ):
+        """
+        Configuration class for the Transformer Actor-Critic with Regularization (TACR).
+
+        Parameters:
+        - lookback (int): Number of past states to consider in the input.
+        - alpha (float): Regularization parameter for the actor's policy.
+        - batch_size (int): Size of batches used in training.
+        - embed_dim (int): Dimension of the embedding layer.
+        - critic_lr (float): Learning rate for the critic network.
+        - actor_lr (float): Learning rate for the actor network.
+        - weight_decay (float): Weight decay factor for regularization. (Currently not used)
+        - warmup_steps (int): Number of warmup steps before training starts.
+        - max_iterations (int): Maximum number of training iterations.
+        - n_steps_per_iteration (int): Number of steps per training iteration.
+        - gamma (float): Discount factor for future rewards.
+        - tau (float): Target network update rate. (Polyak averaging)
+        - state_dim (int): Dimension of the state space.
+        - action_dim (int): Dimension of the action space.
+        - embed_size (int): Size of the embedding for the transformer.
+        - max_episode_length (int): Maximum length of an episode.
+        - action_softmax (bool): Whether to use softmax for action predictions.
+        - action_softmax_dim (int): Dimension for softmax operation.
+        - train_traj_states (list): List of training trajectory states.
+        - train_traj_lengths (list): List of training trajectory lengths.
+        - train_traj_returns (list): List of training trajectory returns.
+        - train_trajectories (List[Trajectory]): List of training trajectories.
+        - state_mean (float): Mean of the state values for normalization.
+        - state_std (float): Standard deviation of the state values for normalization.
+
+        This class holds the configuration settings for the TACR algorithm, including hyperparameters,
+        network configurations, and training data information.
+        """
         self.lookback = lookback
         self.alpha = alpha
-        self.pct_traj = pct_traj
         self.batch_size = batch_size
         self.embed_dim = embed_dim
         self.critic_lr = critic_lr
