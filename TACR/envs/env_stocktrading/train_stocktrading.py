@@ -1,8 +1,6 @@
 import os
 import sys
 
-
-
 # Get parent of parent of parent directory
 parent_of_parent_dir = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -27,10 +25,10 @@ from preprocessing.process_yh_finance import YHFinanceProcessor
     
 if __name__ == "__main__":
     NUM_STEPS_PER_ITERATION = 1000
-    MAX_ITERATIONS = 2000
+    MAX_ITERATIONS = 3000
     GENERATE_NEW_TRAJECTORIES = False
-    WARMUP_ITERATIONS = 500
-    PATIENCE_VALIDATION = 40
+    WARMUP_ITERATIONS = 750
+    PATIENCE_VALIDATION = 50
     VALIDATION_PERIOD = 5
     TRAIN_START_DATE = "2010-01-01"
     TRAIN_END_DATE = "2020-06-01"
@@ -111,7 +109,7 @@ if __name__ == "__main__":
             action_softmax=True,
             alpha=0.5,
             critic_lr=1e-5,
-            actor_lr=1e-5,
+            actor_lr=1e-4,
             gamma=0.99,
             state_mean=train_state_mean,
             state_std=train_state_std,
@@ -131,7 +129,7 @@ if __name__ == "__main__":
             train_avg_actor_loss = np.mean(train_actor_losses)
             avg_train_actor_loss_per_iteration.append(train_avg_actor_loss)
 
-            # Every 25 iterations, evaluate the agent on the environment directly, and compute the average reward
+            # Every VALIDATION_PERIOD iterations, evaluate the agent on the environment directly, and compute the average reward
             if iter % VALIDATION_PERIOD == 0 and iter > 0:
                 trainer.agent.save_actor("saved_models_tacr", "actor_last")
                 trainer.agent.save_critic("saved_models_tacr", "critic_last")
@@ -151,20 +149,19 @@ if __name__ == "__main__":
                 )
 
                 
-                # Check for improvement
-                if avg_reward > best_val_metric:
-                    best_val_metric = avg_reward
-                    patience_counter = 0
+                # Check for improvement after warmup iterations
+                if iter > WARMUP_ITERATIONS:
+                    if avg_reward > best_val_metric:
+                        best_val_metric = avg_reward
+                        patience_counter = 0
 
-                    # Save model
-                    trainer.agent.save_actor("saved_models_tacr", "actor_best")
-                    trainer.agent.save_critic("saved_models_tacr", "critic_best")
-                    trainer.agent.save_config("saved_models_tacr", "config_best")
-                else:
-                    if iter > WARMUP_ITERATIONS:
+                        # Save model
+                        trainer.agent.save_actor("saved_models_tacr", "actor_best")
+                        trainer.agent.save_critic("saved_models_tacr", "critic_best")
+                        trainer.agent.save_config("saved_models_tacr", "config_best")
+                    else:
                         patience_counter += 1
 
-                if iter > WARMUP_ITERATIONS:
                     if patience_counter >= PATIENCE_VALIDATION:
                         print("Early stopping triggered")
                         break

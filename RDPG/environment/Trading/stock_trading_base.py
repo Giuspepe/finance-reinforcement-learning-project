@@ -1,3 +1,4 @@
+import math
 import gymnasium as gym
 import numpy as np
 
@@ -163,7 +164,7 @@ class StockTradingBase(gym.Env):
                 amount,
                 self.turbulence_array[self.day],
                 self.is_turbulent_market[self.day],
-                price * scale,
+                #price * scale,
                 self.stocks * scale,
                 self.stocks_cool_down,
                 self.tech_array[self.day],
@@ -237,7 +238,9 @@ class StockTradingBase(gym.Env):
         # Compute the total assets.
         self.total_assets = self.amount + (self.stocks * price).sum()
         # Compute the reward.
-        reward = (self.total_assets - previous_total_assets) * self.reward_scaling
+        #reward = (self.total_assets - previous_total_assets) * self.reward_scaling
+        # Compute the reward as the log difference between the current and previous total assets.
+        reward = math.log(self.total_assets / previous_total_assets) * self.reward_scaling
         # Compute discounted reward.
         self.discounted_reward = self.discounted_reward * self.discount_factor + reward
         # Check if the episode is done.
