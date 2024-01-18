@@ -174,6 +174,7 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         #reward = (self.account_value - previous_account_value)*self.reward_scaling
         # Get the float value of the reward
         #reward = reward[0]
+        # Compute the reward as the log difference between the current and previous account value
         reward = math.log(self.account_value[0] / previous_account_value) * self.reward_scaling
 
         # Compute discounted reward.

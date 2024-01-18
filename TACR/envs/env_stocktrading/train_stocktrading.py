@@ -1,8 +1,6 @@
 import os
 import sys
 
-
-
 # Get parent of parent of parent directory
 parent_of_parent_dir = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -151,7 +149,7 @@ if __name__ == "__main__":
                 )
 
                 
-                # Check for improvement
+                # Check for improvement after warmup iterations
                 if iter > WARMUP_ITERATIONS:
                     if avg_reward > best_val_metric:
                         best_val_metric = avg_reward

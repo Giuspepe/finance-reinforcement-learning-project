@@ -539,7 +539,6 @@ class DM(TechnicalIndicator):
 #         for column in qqe:
 #             df_after[TechnicalIndicator.return_free_column_from_symbol_in_df(df=df_after, symbol=self.symbol+"_"+column)] = qqe[column]
 
-
 class VORTEX(TechnicalIndicator):
     def __init__(self, length: int):
         super().__init__(symbol="VORTEX")
