@@ -1,16 +1,24 @@
 from torch.utils.tensorboard import SummaryWriter
+import os
 import torch
 
 
 class TensorBoardHandler:
-    def __init__(self, log_dir="runs/experiment"):
+    def __init__(self, log_dir="runs/experiment", log_dir_increment=True):
         """
         Initializes the TensorBoardHandler.
 
         Args:
             log_dir (str): Directory where to save the log files.
         """
+        i = 1
+        if log_dir_increment:
+            while os.path.exists(log_dir):
+                log_dir = f"runs/experiment_{i}"
+                i += 1
+    
         self.writer = SummaryWriter(log_dir)
+
 
     def log_scalar(self, tag, value, step):
         """
