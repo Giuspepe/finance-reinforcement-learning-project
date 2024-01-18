@@ -26,7 +26,7 @@ def download_and_clean_data(yfp: YHFinanceProcessor, tickers: List[str], start_d
     return yfp.clean_data(df_raw)
 
 
-def augment_data(yfp: YHFinanceProcessor, df: pd.DataFrame, indicators: List[str], custom_technical_indicators: List[TechnicalIndicator] = []):
+def augment_data(yfp: YHFinanceProcessor, df: pd.DataFrame, indicators: List[str], custom_technical_indicators: List[TechnicalIndicator] = [], vix: bool = True):
     """
     Augment the stock data with technical indicators and turbulence index.
 
@@ -44,7 +44,8 @@ def augment_data(yfp: YHFinanceProcessor, df: pd.DataFrame, indicators: List[str
     """
     df = yfp.add_technical_indicators(df, indicators, custom_technical_indicators)
     df = yfp.add_turbulence(df, 252) # Assuming 252 trading days in a year
-    df = yfp.add_vix(df) # Add VIX index
+    if vix:
+        df = yfp.add_vix(df) # Add VIX index
 
     # Drop rows with NaN values and reset the index
     df = df.dropna().reset_index(drop=True)

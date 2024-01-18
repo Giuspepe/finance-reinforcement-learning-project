@@ -1,15 +1,19 @@
 import os
 import sys
 
-import numpy as np
-
 # Get parent of parent of parent directory
 parent_of_parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.append(parent_of_parent_dir)
 
 from TACR.tacr import TACR
 from TACR.config.config import TACRConfig
+from TACR.envs.env_stocktrading.utils import create_environment
+from TACR.envs.env_stocktrading.env_stocktrading import SimpleOneStockStockTradingBaseEnv
+from preprocessing.custom_technical_indicators import PCT_RETURN, OBV_PCT_CHANGE, RVI_PCT_CHANGE, ADX, RSI_CATEGORICAL, BINARY_SMA_RISING
+from preprocessing.process_yh_finance import YHFinanceProcessor
 
+import numpy as np
+import pandas as pd
 import gymnasium as gym
 import torch    
 
@@ -20,7 +24,7 @@ def action_softmax_to_value(action: np.array) -> int:
     return decoded_action
     
 
-def evaluate(env: gym.Env, path: str, name_actor="actor", name_config="config", num_episodes=100, max_timesteps_per_episode=10000, silence=True):
+def evaluate(env: SimpleOneStockStockTradingBaseEnv, path: str, name_actor="actor", name_config="config", num_episodes=100, max_timesteps_per_episode=10000, silence=True):
 
     # Prepare TACR
     tacr_config = TACRConfig()
@@ -86,11 +90,12 @@ def evaluate(env: gym.Env, path: str, name_actor="actor", name_config="config", 
         total_reward += reward
 
         if terminated or timestep_count > max_timesteps_per_episode:
+            if not silence:
+                print(f"Episode {episode_count} reward: {total_reward} account value: {env.account_value}")
             obs, _info = env.reset()
             timestep_count = 1
             episode_reward_vector.append(total_reward)
-            if not silence:
-                print(f"Episode {episode_count} reward: {total_reward}")
+
             total_reward = 0
 
             # Reset history for the episode
@@ -110,11 +115,20 @@ def evaluate(env: gym.Env, path: str, name_actor="actor", name_config="config", 
     return episode_reward_vector, avg_reward
 
 if __name__ == "__main__":
-    episode_reward_vector, avg_reward = evaluate("saved_models_tacr", "actor_last", "config_last", num_episodes=1, max_timesteps_per_episode=10000, silence=False)
+    INDICATORS = []
+    CUSTOM_INDICATORS = [
+        PCT_RETURN(length=2), OBV_PCT_CHANGE(length=8), RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2), ADX(length=16), RSI_CATEGORICAL(length=24), BINARY_SMA_RISING(length=24)
+    ]
 
+    yfp = YHFinanceProcessor()
+
+    val_dataset = pd.read_csv("val_stock_data.csv")
+    val_env = create_environment(yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS)
+    episode_reward_vector, avg_reward = evaluate(val_env, "saved_models_tacr", "actor_last", "config_last", num_episodes=1, max_timesteps_per_episode=10000, silence=False)
 
     print(f"Average reward: {avg_reward}")
 
     import matplotlib.pyplot as plt
     plt.plot(episode_reward_vector)
+    print(val_env.account_value)
 

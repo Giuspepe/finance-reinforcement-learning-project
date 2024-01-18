@@ -25,29 +25,29 @@ from preprocessing.process_yh_finance import YHFinanceProcessor
     
 if __name__ == "__main__":
     NUM_STEPS_PER_ITERATION = 1000
-    MAX_ITERATIONS = 3000
-    GENERATE_NEW_TRAJECTORIES = False
-    WARMUP_ITERATIONS = 750
+    MAX_ITERATIONS = 4000
+    GENERATE_NEW_TRAJECTORIES = True
+    WARMUP_ITERATIONS = 1000
     PATIENCE_VALIDATION = 50
     VALIDATION_PERIOD = 5
-    TRAIN_START_DATE = "2010-01-01"
-    TRAIN_END_DATE = "2020-06-01"
-    VAL_START_DATE = "2020-06-01"
+    TRAIN_START_DATE = "2004-01-01"
+    TRAIN_END_DATE = "2018-01-01"
+    VAL_START_DATE = "2018-01-01"
     VAL_END_DATE = "2024-01-01"
     TICKERS = ["OXY"]
     INDICATORS = []
     CUSTOM_INDICATORS = [
         PCT_RETURN(length=2), OBV_PCT_CHANGE(length=8), RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2), ADX(length=16), RSI_CATEGORICAL(length=24), BINARY_SMA_RISING(length=24)
     ]
-    DOWNLOAD_DATA = False
+    DOWNLOAD_DATA = True
 
     yfp = YHFinanceProcessor()
     if DOWNLOAD_DATA:
         train_df = download_and_clean_data(yfp, TICKERS, TRAIN_START_DATE, TRAIN_END_DATE)
-        train_df_aug = augment_data(yfp, train_df, INDICATORS, CUSTOM_INDICATORS)
+        train_df_aug = augment_data(yfp, train_df, INDICATORS, CUSTOM_INDICATORS, vix=False)
         save_data(train_df_aug, "train_stock_data.csv")
         val_df = download_and_clean_data(yfp, TICKERS, VAL_START_DATE, VAL_END_DATE)
-        val_df_aug = augment_data(yfp, val_df, INDICATORS, CUSTOM_INDICATORS)
+        val_df_aug = augment_data(yfp, val_df, INDICATORS, CUSTOM_INDICATORS, vix=False)
         save_data(val_df_aug, "val_stock_data.csv")
 
     train_dataset = pd.read_csv("train_stock_data.csv")
