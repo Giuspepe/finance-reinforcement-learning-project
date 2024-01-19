@@ -76,7 +76,7 @@ class IRDPG:
         lower_normalization_bounds=None,
     ):
         """
-        Initializes the RDPG agent.
+        Initializes the iRDPG agent.
 
         Args:
             input_dim (int): Dimensionality of the input space.
@@ -102,6 +102,16 @@ class IRDPG:
         The `gamma`, `lr`, and `tau` parameters are standard hyperparameters in reinforcement
         learning, controlling the discounting of future rewards, the learning rate of the
         optimizers, and the rate of updating the target networks, respectively.
+
+        The `action_noise` parameter controls the amount of noise added to the actions during
+        training. This is used to encourage exploration and prevent the agent from getting stuck
+        in local optima. The `action_noise_decay_steps` parameter determines the number of steps
+        over which the action noise is decayed to 0.
+
+        The `lambda_policy` parameter controls the balance between the policy gradient and BC losses.
+        The `upper_normalization_bounds` and `lower_normalization_bounds` parameters are used to
+        normalize the inputs to the networks. This is important for stable training, as it ensures
+        that the inputs are within a reasonable range.
 
         Additionally, the agent's device is set based on the availability of GPU, and
         initial hidden states for the recurrent networks are set to None.
@@ -178,6 +188,7 @@ class IRDPG:
 
         Args:
             observation (array-like): The current observation from the environment.
+            deterministic (bool, optional): Whether to use a deterministic policy. Defaults to True.
 
         Returns:
             action (numpy.ndarray): The action determined by the actor network.
@@ -220,25 +231,26 @@ class IRDPG:
         This method updates both the actor and critic networks using the provided batch of
         experiences. It involves several key steps:
 
-        1. Processing the batch data through both the actor and critic recorded history networks
-           to generate the required inputs for the policy and value function updates.
+        1. Processing the batch data through both the actor and critic recorded history networks to generate the required inputs for the policy
+        and value function updates.
 
-        2. Calculating the target values for the critic update using the target networks,
-           which are more stable versions of the main networks. This is in line with the
-           Temporal Difference (TD) learning approach and is crucial for stable training.
+        2. Calculating the target values for the critic update using the target networks, which are more stable versions of the main networks. 
+        This is in line with the Temporal Difference (TD) learning approach and is crucial for stable training.
 
-        3. Computing the loss for the critic network based on the difference (TD error)
-           between the predicted and target values. The loss is then backpropagated to update
-           the critic networks.
+        3. Computing the loss for the critic network based on the difference (TD error) between the predicted and target values. 
+        The loss is then backpropagated to update the critic networks.
 
-        4. Updating the actor network by maximizing the expected return, as estimated by the critic network.
-           This involves computing a policy loss and performing backpropagation to update the actor networks.
+        4. Updating the actor network by maximizing the expected return, as estimated by the critic network. This involves computing a 
+        policy loss and performing backpropagation to update the actor networks. Additionally, Behavior Cloning (BC) loss is computed 
+        to measure the gap between the policy actions and expert (prophetic) actions. The BC loss is only recorded when the critic's 
+        Q-value indicates that the expert actions perform better than the policy actions, following a Q-filter approach.
 
-        5. Utilizing Polyak averaging to update the target networks. This step ensures that the target networks
-           change slowly, which contributes to the overall stability of the learning process.
+        5. Utilizing Polyak averaging to update the target networks. This step ensures that the target networks change slowly, which 
+        contributes to the overall stability of the learning process.
 
-        The method returns a dictionary containing metrics such as the critic loss and
-        the average Q values, which can be useful for monitoring the training process.
+        The method returns a dictionary containing metrics such as the critic loss, actor loss, BC loss, and average Q values, which can be useful for monitoring the training process..
+
+
         """
         # Get recorded history from actor and critic
         actor_rh, _ = self.actor_rh(batch.observations)
