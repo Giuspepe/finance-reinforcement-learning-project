@@ -164,7 +164,7 @@ class StockTradingBase(gym.Env):
                 amount,
                 self.turbulence_array[self.day],
                 self.is_turbulent_market[self.day],
-                #price * scale,
+                price * scale,
                 self.stocks * scale,
                 self.stocks_cool_down,
                 self.tech_array[self.day],

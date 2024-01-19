@@ -7,8 +7,8 @@ sys.path.append(parent_of_parent_dir)
 
 from TACR.tacr import TACR
 from TACR.config.config import TACRConfig
-from TACR.envs.env_stocktrading.utils import create_environment
-from TACR.envs.env_stocktrading.env_stocktrading import SimpleOneStockStockTradingBaseEnv
+from env_stocktrading.utils import create_environment
+from env_stocktrading.env_stocktrading import SimpleOneStockStockTradingBaseEnv
 from preprocessing.custom_technical_indicators import PCT_RETURN, OBV_PCT_CHANGE, RVI_PCT_CHANGE, ADX, RSI_CATEGORICAL, BINARY_SMA_RISING
 from preprocessing.process_yh_finance import YHFinanceProcessor
 
