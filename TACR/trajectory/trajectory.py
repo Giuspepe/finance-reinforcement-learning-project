@@ -4,6 +4,8 @@ from typing import Any, Callable, List, Optional
 import gymnasium
 import numpy as np
 
+from env_stocktrading.env_stocktrading import SimpleOneStockStockTradingBaseEnv
+
 
 class UnfinishedTrajectory:
     def __init__(self):
@@ -172,7 +174,8 @@ class TrajectoryGenerator:
             next_observation, reward, done, truncated, info = self.env.step(picked_action)
             done_or_truncated = done or truncated
             trajectory.append_observation(np.array(observation), reward, done_or_truncated, action)
-            print(f"Step {step+1}/{len(actions)}, acc_value: {self.env.account_value}, cash_in_hand: {self.env.cash_in_hand}, shares_held: {self.env.shares_held}, price: {self.env.price_array[self.env.day]}, action: {action}")
+            if isinstance(self.env, SimpleOneStockStockTradingBaseEnv):
+                print(f"Step {step+1}/{len(actions)}, acc_value: {self.env.account_value}, cash_in_hand: {self.env.cash_in_hand}, shares_held: {self.env.shares_held}, price: {self.env.close_array[self.env.day]}, action: {action}")
             observation = next_observation
 
             if done_or_truncated: 

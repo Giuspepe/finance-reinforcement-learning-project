@@ -16,7 +16,7 @@ from TACR.tacr import TACR
 from TACR.trainer.trainer import Trainer
 from TACR.trajectory.trajectory import TrajectoryGenerator
 from TACR.envs.env_stocktrading.eval_stocktrading import evaluate
-from TACR.envs.env_stocktrading.utils import (
+from env_stocktrading.utils import (
     augment_data,
     create_environment,
     download_and_clean_data,
@@ -132,13 +132,13 @@ if __name__ == "__main__":
             train_traj_states=train_states,
             train_trajectories=train_trajectories,
             action_softmax=True,
-            alpha=0.5,
-            critic_lr=2e-4,
+            alpha=0.9,
+            critic_lr=1e-5,
             actor_lr=1e-5,
             gamma=DISCOUNT_FACTOR,
             state_mean=train_state_mean,
             state_std=train_state_std,
-            batch_size=32,
+            batch_size=48,
         )
         agent = TACR(config=tacr_config)
 

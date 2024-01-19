@@ -49,9 +49,9 @@ def create_environment(yfp, dataset, indicators):
     state_space = 1 + 2 * stock_dimension + (len(indicators) + 1) * stock_dimension
     print(f"Stock Dimension: {stock_dimension}, State Space: {state_space}")
 
-    price_array, tech_array, turbulence_array = yfp.df_to_array(dataset, indicators, True)
+    close_array, open_array, high_array, low_array, tech_array, turbulence_array = yfp.df_to_array(dataset, indicators, [], True)
     env_config = {
-        "price_array": price_array,
+        "price_array": close_array,
         "tech_array": tech_array,
         "turbulence_array": turbulence_array,
         "is_training_mode": True,

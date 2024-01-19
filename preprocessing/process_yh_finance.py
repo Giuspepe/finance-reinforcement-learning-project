@@ -346,13 +346,19 @@ class YHFinanceProcessor:
             raise ValueError("df must be a pandas DataFrame")
 
         unique_tickers = df["tic"].unique()
-        price_arrays = []
+        close_arrays = []
+        open_arrays = []
+        high_arrays = []
+        low_arrays = []
         tech_arrays = []
         turb_arrays = []
 
         for tic in unique_tickers:
             ticker_data = df[df["tic"] == tic]
-            price_arrays.append(ticker_data[["close"]].values)
+            close_arrays.append(ticker_data[["close"]].values)
+            open_arrays.append(ticker_data[["open"]].values)
+            high_arrays.append(ticker_data[["high"]].values)
+            low_arrays.append(ticker_data[["low"]].values)
             # Get array of custom technical indicators by looking at the columns of the dataframe and selecting the ones that start with
             # the prefix "CT_"
             custom_tech_arrays = ticker_data[[col for col in ticker_data.columns if col.startswith("CT_")]].values
@@ -364,14 +370,17 @@ class YHFinanceProcessor:
                 turb_arrays.append(ticker_data["VIXY"].values)
 
         # Use numpy.hstack to concatenate arrays horizontally
-        price_array = np.hstack(price_arrays)
+        close_arrays = np.hstack(close_arrays)
+        open_arrays = np.hstack(open_arrays)
+        high_arrays = np.hstack(high_arrays)
+        low_arrays = np.hstack(low_arrays)
         tech_array = np.hstack(tech_arrays)
         if use_vix:
             turbulence_array = np.hstack(turb_arrays)
         else:
             turbulence_array = np.array([])
 
-        return price_array, tech_array, turbulence_array
+        return close_arrays, open_arrays, high_arrays, low_arrays, tech_array, turbulence_array
 
     def fetch_latest_data(
         self, ticker_list, time_interval, tech_indicator_list, limit=100
@@ -415,7 +424,7 @@ class YHFinanceProcessor:
         df_with_indicators = self.add_technical_indicator(data_df, tech_indicator_list)
 
         # Convert to arrays for price, technical indicators, and VIX
-        price_array, tech_array, _ = self.df_to_array(
+        close_array, open_array, high_array, low_array, tech_array, _ = self.df_to_array(
             df_with_indicators, tech_indicator_list, if_vix=True
         )
 
@@ -424,4 +433,4 @@ class YHFinanceProcessor:
             "VIXY", start=start_datetime, end=end_datetime, interval=time_interval
         )["Close"].values
 
-        return price_array[-1], tech_array[-1], latest_turb
+        return close_array[-1], open_array[-1], high_array[-1], low_array[-1], tech_array[-1], latest_turb

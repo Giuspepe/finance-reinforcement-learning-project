@@ -1,12 +1,11 @@
 from typing import List
-import gymnasium
 import pandas as pd
 import numpy as np
-from TACR.envs.env_stocktrading.env_stocktrading import SimpleOneStockStockTradingBaseEnv
+from env_stocktrading.env_stocktrading import SimpleOneStockStockTradingBaseEnv
 
 from TACR.trajectory.trajectory import Trajectory, TrajectoryGenerator
 
-def best_trade_on_window_action_generator(offset: int = 1, window_size: int = 10, min_variation: float = 0.01, price_array: np.ndarray = None):
+def best_trade_on_window_action_generator(offset: int = 1, window_size: int = 10, min_variation: float = 0.01, close_array: np.ndarray = None):
     """
     Generate actions based on the best trade within a specified window of stock prices, prophetically.
 
@@ -14,7 +13,7 @@ def best_trade_on_window_action_generator(offset: int = 1, window_size: int = 10
     - offset (int): Initial offset for the window.
     - window_size (int): Size of the window to consider for each trade decision.
     - min_variation (float): Minimum variation in price to consider a change significant.
-    - price_array (np.ndarray): Array of stock prices.
+    - close_array (np.ndarray): Array of close stock prices.
 
     Returns:
     - np.ndarray: Array of one-hot encoded actions for the length of the price array.
@@ -29,16 +28,16 @@ def best_trade_on_window_action_generator(offset: int = 1, window_size: int = 10
     # If the window is out of bounds, the action is 0 (hold).
 
     # Initialize an action array that has all zeros for the dataset length using numpy
-    actions = np.zeros(len(price_array))
+    actions = np.zeros(len(close_array))
 
     # Iterate over the dataset, generating windows of size 'window_size' and offset by 'offset'. Note that
     # actions can only take place at the beginning of a window, and at the end of the window, if the action is non-zero
     # then if the same signal is repeated (ex: beginning of window = 1, end of window = 1), then the action = 0. If this is not the case, close the position by doing new_action = -action
     # Iterate over the dataset
-    for i in range(offset, len(price_array) - window_size, window_size):  # Iterate in steps of window_size
+    for i in range(offset, len(close_array) - window_size, window_size):  # Iterate in steps of window_size
         j = i+1 # Prophetic Actions
-        start_price = price_array[j]
-        end_price = price_array[j + window_size - 1]
+        start_price = close_array[j]
+        end_price = close_array[j + window_size - 1]
         price_change = end_price - start_price
 
         # Determine action based on price change and min_variation
@@ -107,7 +106,7 @@ def generate_best_trade_on_window_trajectories(env: SimpleOneStockStockTradingBa
     for window_size in window_sizes:
         for offset in offsets:
             if offset*1.5 < window_size:
-                trade_list = best_trade_on_window_action_generator(offset=offset, window_size=window_size, price_array=env.price_array, min_variation=0.003)
+                trade_list = best_trade_on_window_action_generator(offset=offset, window_size=window_size, close_array=env.close_array, min_variation=0.003)
                 trajectory = generator.generate_trajectory_from_predefined_list_of_actions(trade_list)
                 trajectories.append(trajectory)
 

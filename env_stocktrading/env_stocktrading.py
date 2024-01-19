@@ -12,9 +12,14 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         buy_transaction_fee_rate: float = 0.00025,
         sell_transaction_fee_rate: float = 0.00025,
         reward_scaling: float = 1,
-        price_array: np.ndarray = None,
+        close_array: np.ndarray = None,
+        open_array: np.ndarray = None,
+        high_array: np.ndarray = None,
+        low_array: np.ndarray = None,
         tech_array: np.ndarray = None,
         is_training_mode: bool = True,
+        index_of_expert_tech_indicator: int = -1,
+        prophetic_actions_window_length: int = 10,
     ):
         """
         A simple stock trading environment for a single stock.
@@ -29,14 +34,24 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         - buy_transaction_fee_rate (float): Transaction fee rate for buying (default: 0.00025).
         - sell_transaction_fee_rate (float): Transaction fee rate for selling (default: 0.00025).
         - reward_scaling (float): Scaling factor for rewards (default: 1).
-        - price_array (np.ndarray): Array of stock prices.
+        - close_array (np.ndarray): Array of stock close prices.
         - tech_array (np.ndarray): Array of technical indicators.
         - is_training_mode (bool): Flag to indicate training mode (default: True).
         """
         super().__init__()
         self.env_name = "SimpleStockTradingBase-v0"
-        self.price_array = price_array.astype(np.float32)
+        self.close_array = close_array.astype(np.float32)
+        self.open_array = open_array.astype(np.float32)
+        self.high_array = high_array.astype(np.float32)
+        self.low_array = low_array.astype(np.float32)
         self.tech_array = tech_array.astype(np.float32)
+
+        # Get an array for the expert technical indicator
+        self.expert_tech_indicator = self.tech_array[:, index_of_expert_tech_indicator]
+
+        # Prophetic Actions
+        self.prophetic_actions_window_length = prophetic_actions_window_length
+        self.prophetic_actions = self.generate_prophetic_actions()
 
         self.initial_account_value = initial_account_value
         self.discount_factor = discount_factor
@@ -45,7 +60,7 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         self.sell_transaction_fee_rate = sell_transaction_fee_rate
         self.reward_scaling = reward_scaling
         self.is_training_mode = is_training_mode
-        self.max_episode_steps = self.price_array.shape[0]
+        self.max_episode_steps = self.close_array.shape[0]
         
         self.shares_held = 0
         self.account_value = initial_account_value
@@ -58,7 +73,7 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         
         self.action_dim = self.action_space.n
 
-        # Observation space: [shares_held, technical indicators].
+        # Observation space: [long_short_hold, technical indicators].
         self.state_dim = 1 + self.tech_array.shape[1]
         self.observation_space = gym.spaces.Box(
             low=-np.inf, high=np.inf, shape=(self.state_dim,), dtype=np.float32
@@ -83,14 +98,11 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         self.discounted_reward = 0
         self.cash_in_hand = self.account_value
 
-        return self.get_state(self.price_array), dict()
+        return self.get_state(), dict()
 
-    def get_state(self, price) -> np.ndarray:
+    def get_state(self) -> np.ndarray:
         """
         Get the current state of the environment.
-
-        Parameters:
-        - price (np.ndarray): Current stock price.
 
         Returns:
         - np.ndarray: The current state, including shares held and technical indicators.
@@ -99,7 +111,13 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         """
         indicators = self.tech_array[self.day]
 
-        return np.hstack((self.shares_held, indicators))
+        long_short_hold = 0
+        if self.shares_held > 0:
+            long_short_hold = 1
+        elif self.shares_held < 0:
+            long_short_hold = -1
+
+        return np.hstack((long_short_hold, indicators))
     
     def step(self, actions: int) -> tuple:
         """
@@ -123,7 +141,7 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
             if self.shares_held < 0:
                 shares_to_move = -self.shares_held
                 self.cash_in_hand -= (
-                    shares_to_move * self.price_array[self.day] * (1 + self.buy_transaction_fee_rate)
+                    shares_to_move * self.close_array[self.day] * (1 + self.buy_transaction_fee_rate)
                 )
                 self.shares_held += shares_to_move
             # Check if we are already long in the previous step, so we can't become "more" long
@@ -132,23 +150,23 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
             else:
                 shares_to_move = np.floor(
                     (actions * self.percentage_acc_value_per_trade * self.account_value)
-                    / self.price_array[self.day]
+                    / self.close_array[self.day]
                 )
 
-                if self.cash_in_hand < shares_to_move * self.price_array[self.day] * (
+                if self.cash_in_hand < shares_to_move * self.close_array[self.day] * (
                     1 + self.buy_transaction_fee_rate
                 ):
                     shares_to_move = 0
                 else: 
                     self.cash_in_hand -= (
-                        shares_to_move * self.price_array[self.day] * (1 + self.buy_transaction_fee_rate)
+                        shares_to_move * self.close_array[self.day] * (1 + self.buy_transaction_fee_rate)
                     )
                     self.shares_held += shares_to_move
         # If sell action, we first check if we are long, if so, then close the position to sell
         elif actions == -1:
             if self.shares_held > 0:
                 shares_to_move = self.shares_held
-                total_volume = shares_to_move * self.price_array[self.day] * (1 - self.sell_transaction_fee_rate)
+                total_volume = shares_to_move * self.close_array[self.day] * (1 - self.sell_transaction_fee_rate)
                 self.cash_in_hand += abs(total_volume)
                 self.shares_held -= abs(shares_to_move)
             # Check if we are already short in the previous step, so we can't become "more" short
@@ -157,20 +175,20 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
             else:
                 shares_to_move = np.floor(
                     (actions * self.percentage_acc_value_per_trade * self.account_value)
-                    / self.price_array[self.day]
+                    / self.close_array[self.day]
                 )
 
-                total_volume = shares_to_move * self.price_array[self.day] * (1 - self.sell_transaction_fee_rate)
+                total_volume = shares_to_move * self.close_array[self.day] * (1 - self.sell_transaction_fee_rate)
                 self.cash_in_hand += abs(total_volume)
                 self.shares_held -= abs(shares_to_move)
         
 
         # Get state for the next day
-        next_state = self.get_state(self.price_array)
+        next_state = self.get_state()
 
         # Update the account value
         previous_account_value = self.account_value
-        self.account_value = self.cash_in_hand + self.shares_held * self.price_array[self.day]
+        self.account_value = self.cash_in_hand + self.shares_held * self.close_array[self.day]
         #reward = (self.account_value - previous_account_value)*self.reward_scaling
         # Get the float value of the reward
         #reward = reward[0]
@@ -184,35 +202,94 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         done = self.day == (self.max_episode_steps-1)
         if done:
             # The reward is the discounted reward.
-            reward = self.discounted_reward
+            #reward = self.discounted_reward
+            # The reward is zero
+            reward = 0
             # Compute the episode return.
             self.episode_return = self.account_value / self.initial_account_value
 
         # Return the state, reward, done, (truncated), info.
         return next_state, reward, done, False, dict()
     
-    @staticmethod
-    def scaled_sigmoid(
-        array: np.ndarray, threshold: float, output_bounds: tuple = (-0.5, 0.5)
-    ) -> np.ndarray:
+    def expert_action(self, current_index: int) -> int:
         """
-        Applies a scaled sigmoid function to the input array.
+        Get the expert action for the current state.
 
-        Parameters:
-        - array (np.ndarray): The input array.
-        - threshold (float): The threshold value for the sigmoid function.
-        - output_bounds (tuple, optional): The output bounds for the scaled sigmoid function. Defaults to (-0.5, 0.5).
 
         Returns:
-        - np.ndarray: The array after applying the scaled sigmoid function.
-        """
-        # Sigmoid function
-        def sigmoid(x):
-            return 1 / (1 + np.exp(-x))
+        - int: The expert action for the current state.
 
-        # Apply sigmoid function to the array
-        array = np.asarray(array)
-        sigmoid_output = sigmoid(array / threshold)
-        # Scale the sigmoid output to the output bounds
-        output_range = output_bounds[1] - output_bounds[0]
-        return sigmoid_output * output_range + output_bounds[0]
+        This method returns the expert action for the current state.
+        Currently uses BINARY_SMA_RISING(24) indicator to determine the action.
+        """
+        if self.expert_tech_indicator[current_index] == 1:
+            if self.shares_held < 1:
+                return 1
+            else:
+                return 0
+        else:
+            if self.shares_held > -1:
+                return -1
+            else:
+                return 0
+            
+    def generate_prophetic_actions(self) -> np.ndarray:
+        """
+        Generate the prophetic actions for the environment.
+
+        Returns:
+        - np.ndarray: The prophetic actions for the environment.
+
+        This method analyzes windows of stock prices and determines the best action to take (buy, sell, hold)
+        by generating windows of random length from 3 to 10 days and calculate the price change withing the start of the window
+        and for each day in the window until the end, taking the action that maximizes the gain for any of the days and closing the
+        position at the day where the gain is maximum. Then continue from the day after the position is ended and NOT at the end of the window.
+        """
+        # Initialize an action array with all zeros for the dataset length
+        actions = np.zeros(len(self.close_array), dtype=int)
+
+        day = 0
+        while day < len(self.close_array):
+            # Generate a window of length 10 days
+            window_length = self.prophetic_actions_window_length
+            window_end = min(day + window_length, len(self.close_array))
+
+            # Initialize variables to track the best action and its day
+            best_gain = 0
+            best_action_day = day
+            best_action = 0  # 0 for hold, 1 for buy, -1 for sell
+
+            for window_day in range(day, window_end):
+                price_change = self.close_array[window_day] - self.close_array[day]
+
+                # Check if buying on 'day' and selling on 'window_day' is beneficial
+                if price_change > best_gain:
+                    best_gain = price_change
+                    best_action_day = window_day
+                    best_action = 1  # Buy
+
+                # We can also check for selling (if we held stocks) based on other indicators or conditions here
+
+            # Apply the best action found, just for the initial day of the window
+            actions[day] = best_action
+            # Close the position on the best action day
+            actions[best_action_day] = -best_action
+
+            # Move to the day after the best action day to start the next window
+            day = best_action_day + 1
+
+        return actions
+
+    def get_prophetic_action(self, current_index: int) -> int:
+        """
+        Get the prophetic action for the current state.
+
+
+        Returns:
+        - int: The prophetic action for the current state.
+
+        This method returns the prophetic action for the current state.
+        """
+        return self.prophetic_actions[current_index]
+
+        
