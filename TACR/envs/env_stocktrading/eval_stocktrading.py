@@ -123,7 +123,7 @@ if __name__ == "__main__":
     yfp = YHFinanceProcessor()
 
     val_dataset = pd.read_csv("val_stock_data.csv")
-    val_env = create_environment(yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS)
+    val_env = create_environment(yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=0.999)
     episode_reward_vector, avg_reward = evaluate(val_env, "saved_models_tacr", "actor_last", "config_last", num_episodes=1, max_timesteps_per_episode=10000, silence=False)
 
     print(f"Average reward: {avg_reward}")

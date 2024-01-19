@@ -16,17 +16,31 @@ from TACR.tacr import TACR
 from TACR.trainer.trainer import Trainer
 from TACR.trajectory.trajectory import TrajectoryGenerator
 from TACR.envs.env_stocktrading.eval_stocktrading import evaluate
-from TACR.envs.env_stocktrading.utils import augment_data, create_environment, download_and_clean_data, save_data
-from TACR.envs.env_stocktrading.traj_stocktrading_generator import generate_best_trade_on_window_trajectories
+from TACR.envs.env_stocktrading.utils import (
+    augment_data,
+    create_environment,
+    download_and_clean_data,
+    save_data,
+)
+from TACR.envs.env_stocktrading.traj_stocktrading_generator import (
+    generate_best_trade_on_window_trajectories,
+)
 
-from preprocessing.custom_technical_indicators import RVI_PCT_CHANGE, OBV_PCT_CHANGE, PCT_RETURN, ADX, RSI_CATEGORICAL, BINARY_SMA_RISING
+from preprocessing.custom_technical_indicators import (
+    RVI_PCT_CHANGE,
+    OBV_PCT_CHANGE,
+    PCT_RETURN,
+    ADX,
+    RSI_CATEGORICAL,
+    BINARY_SMA_RISING,
+)
 from preprocessing.process_yh_finance import YHFinanceProcessor
 
-    
+
 if __name__ == "__main__":
     NUM_STEPS_PER_ITERATION = 1000
     MAX_ITERATIONS = 4000
-    GENERATE_NEW_TRAJECTORIES = True
+    GENERATE_NEW_TRAJECTORIES = False
     WARMUP_ITERATIONS = 1000
     PATIENCE_VALIDATION = 50
     VALIDATION_PERIOD = 5
@@ -37,14 +51,24 @@ if __name__ == "__main__":
     TICKERS = ["OXY"]
     INDICATORS = []
     CUSTOM_INDICATORS = [
-        PCT_RETURN(length=2), OBV_PCT_CHANGE(length=8), RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2), ADX(length=16), RSI_CATEGORICAL(length=24), BINARY_SMA_RISING(length=24)
+        PCT_RETURN(length=2),
+        OBV_PCT_CHANGE(length=8),
+        RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2),
+        ADX(length=16),
+        RSI_CATEGORICAL(length=24),
+        BINARY_SMA_RISING(length=24),
     ]
-    DOWNLOAD_DATA = True
+    DOWNLOAD_DATA = False
+    DISCOUNT_FACTOR = 0.999
 
     yfp = YHFinanceProcessor()
     if DOWNLOAD_DATA:
-        train_df = download_and_clean_data(yfp, TICKERS, TRAIN_START_DATE, TRAIN_END_DATE)
-        train_df_aug = augment_data(yfp, train_df, INDICATORS, CUSTOM_INDICATORS, vix=False)
+        train_df = download_and_clean_data(
+            yfp, TICKERS, TRAIN_START_DATE, TRAIN_END_DATE
+        )
+        train_df_aug = augment_data(
+            yfp, train_df, INDICATORS, CUSTOM_INDICATORS, vix=False
+        )
         save_data(train_df_aug, "train_stock_data.csv")
         val_df = download_and_clean_data(yfp, TICKERS, VAL_START_DATE, VAL_END_DATE)
         val_df_aug = augment_data(yfp, val_df, INDICATORS, CUSTOM_INDICATORS, vix=False)
@@ -52,8 +76,12 @@ if __name__ == "__main__":
 
     train_dataset = pd.read_csv("train_stock_data.csv")
     val_dataset = pd.read_csv("val_stock_data.csv")
-    train_env = create_environment(yfp, train_dataset, INDICATORS, CUSTOM_INDICATORS)
-    val_env = create_environment(yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS)
+    train_env = create_environment(
+        yfp, train_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=DISCOUNT_FACTOR
+    )
+    val_env = create_environment(
+        yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=DISCOUNT_FACTOR
+    )
 
     action_dim = train_env.action_space.n
 
@@ -68,11 +96,8 @@ if __name__ == "__main__":
         with open("tacr_experiment_data/trajs_best_trade_on_window.pkl", "rb") as f:
             trajectories_best_trade_on_window = pickle.load(f)
 
-
         # Concatenate all trajectories, considering that they are lists
-        trajectories = (
-            trajectories_best_trade_on_window
-        )
+        trajectories = trajectories_best_trade_on_window
 
         train_trajectories = trajectories
 
@@ -108,9 +133,9 @@ if __name__ == "__main__":
             train_trajectories=train_trajectories,
             action_softmax=True,
             alpha=0.5,
-            critic_lr=1e-5,
-            actor_lr=1e-4,
-            gamma=0.99,
+            critic_lr=2e-4,
+            actor_lr=1e-5,
+            gamma=DISCOUNT_FACTOR,
             state_mean=train_state_mean,
             state_std=train_state_std,
             batch_size=32,
@@ -139,7 +164,7 @@ if __name__ == "__main__":
                     "saved_models_tacr",
                     "actor_last",
                     "config_last",
-                    num_episodes=1, # We can only do 1 episode because its a fixed dataset
+                    num_episodes=1,  # We can only do 1 episode because its a fixed dataset
                     max_timesteps_per_episode=100000,
                     silence=True,
                 )
@@ -148,7 +173,6 @@ if __name__ == "__main__":
                     f"Iteration {iter+1}/{MAX_ITERATIONS}, Average Actor Train Loss: {train_avg_actor_loss}, Average Reward on Eval: {avg_reward}"
                 )
 
-                
                 # Check for improvement after warmup iterations
                 if iter > WARMUP_ITERATIONS:
                     if avg_reward > best_val_metric:

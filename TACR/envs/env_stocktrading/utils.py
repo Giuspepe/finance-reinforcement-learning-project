@@ -66,7 +66,7 @@ def save_data(df: pd.DataFrame, filename: str):
     df.to_csv(filename)
 
 
-def create_environment(yfp: YHFinanceProcessor, dataset: pd.DataFrame, indicators: List[str], custom_technical_indicators: List[TechnicalIndicator] = []):
+def create_environment(yfp: YHFinanceProcessor, dataset: pd.DataFrame, indicators: List[str], custom_technical_indicators: List[TechnicalIndicator] = [], gamma: float = 0.99):
     """
     Create and return a stock trading environment.
 
@@ -75,6 +75,7 @@ def create_environment(yfp: YHFinanceProcessor, dataset: pd.DataFrame, indicator
     - dataset (pd.DataFrame): The DataFrame containing stock data.
     - indicators (List[str]): List of standard technical indicators to include.
     - custom_technical_indicators (List[TechnicalIndicator], optional): List of custom technical indicators to include.
+    - gamma (float, optional): The discount factor for the environment.
 
     Returns:
     - SimpleOneStockStockTradingBaseEnv: An instance of the stock trading environment.
@@ -83,6 +84,6 @@ def create_environment(yfp: YHFinanceProcessor, dataset: pd.DataFrame, indicator
     The environment can be used for training reinforcement learning models.
     """
     # Convert the DataFrame to arrays for price, technical indicators, and turbulence index
-    price_array, tech_array, turbulence_array = yfp.df_to_array(dataset, indicators, custom_technical_indicators, True) 
-    return SimpleOneStockStockTradingBaseEnv(price_array=price_array, tech_array=tech_array, is_training_mode=True)
+    price_array, tech_array, turbulence_array = yfp.df_to_array(dataset, indicators, custom_technical_indicators, False) 
+    return SimpleOneStockStockTradingBaseEnv(price_array=price_array, tech_array=tech_array, is_training_mode=True, discount_factor=gamma)
 

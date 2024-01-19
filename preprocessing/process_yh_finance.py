@@ -360,12 +360,16 @@ class YHFinanceProcessor:
             # of technical indicators
             tech_arrays.append(ticker_data[tech_indicator_list].values)
             tech_arrays.append(custom_tech_arrays)
-            turb_arrays.append(ticker_data["VIXY" if use_vix else "turbulence"].values)
+            if use_vix:
+                turb_arrays.append(ticker_data["VIXY"].values)
 
         # Use numpy.hstack to concatenate arrays horizontally
         price_array = np.hstack(price_arrays)
         tech_array = np.hstack(tech_arrays)
-        turbulence_array = np.hstack(turb_arrays)
+        if use_vix:
+            turbulence_array = np.hstack(turb_arrays)
+        else:
+            turbulence_array = np.array([])
 
         return price_array, tech_array, turbulence_array
 
