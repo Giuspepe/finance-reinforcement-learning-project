@@ -7,8 +7,8 @@ sys.path.append(parent_of_parent_dir)
 
 from TACR.tacr import TACR
 from TACR.config.config import TACRConfig
-from env_stocktrading.utils import create_environment
-from env_stocktrading.env_stocktrading import SimpleOneStockStockTradingBaseEnv
+from env_stocktrading.utils_portfolio_allocation import create_environment
+from env_stocktrading.env_portfolio_allocation import SimplePortfolioAllocationBaseEnv
 from preprocessing.custom_technical_indicators import PCT_RETURN, OBV_PCT_CHANGE, RSI, RVI_PCT_CHANGE, ADX, RSI_CATEGORICAL, BINARY_SMA_RISING
 from preprocessing.process_yh_finance import YHFinanceProcessor
 
@@ -16,15 +16,9 @@ import numpy as np
 import pandas as pd
 import gymnasium as gym
 import torch    
-
-# Custom action picker function that decodes one-hot encoded action
-def action_softmax_to_value(action: np.array) -> int:
-    index_of_max_probability = np.argmax(action)
-    decoded_action = index_of_max_probability - 1
-    return decoded_action
     
 
-def evaluate(env: SimpleOneStockStockTradingBaseEnv, path: str, name_actor="actor", name_config="config", num_episodes=100, max_timesteps_per_episode=10000, silence=True):
+def evaluate(env: SimplePortfolioAllocationBaseEnv, path: str, name_actor="actor", name_config="config", num_episodes=100, max_timesteps_per_episode=10000, silence=True):
 
     # Prepare TACR
     tacr_config = TACRConfig()
@@ -71,12 +65,10 @@ def evaluate(env: SimpleOneStockStockTradingBaseEnv, path: str, name_actor="acto
             timesteps.to(dtype=torch.long),
         )
 
-        action = action.reshape(1, action_dim)
+        action = action.reshape(action_dim)
 
         actions[-1] = action
         action = action.detach().cpu().numpy()
-
-        action = action_softmax_to_value(action)
         
         obs, reward, terminated, truncated, info = env.step(action)
         obs = np.array(obs)
@@ -98,17 +90,6 @@ def evaluate(env: SimpleOneStockStockTradingBaseEnv, path: str, name_actor="acto
 
             total_reward = 0
 
-            # Visualize Actions
-            # actions_decoded = []
-            # for action in actions:
-            #     action = action.reshape(1, action_dim)
-            #     action = action.detach().cpu().numpy()
-            #     actions_decoded.append(action_softmax_to_value(action))
-            # # Matplotlib
-            # import matplotlib.pyplot as plt
-            # plt.plot(actions_decoded)
-            # plt.show()
-
             # Reset history for the episode
             states = torch.from_numpy(obs).reshape(1, state_dim).to(device=tacr.device, dtype=torch.float32)
             actions = torch.zeros((0, action_dim), device=tacr.device, dtype=torch.float32)
@@ -126,7 +107,13 @@ def evaluate(env: SimpleOneStockStockTradingBaseEnv, path: str, name_actor="acto
     return episode_reward_vector, avg_reward
 
 if __name__ == "__main__":
+    # Ensure the data directory exists
+    data_dir = "data/portfolio"
+    os.makedirs(data_dir, exist_ok=True)
+    TICKERS = ["INTC", "APPL"]
     INDICATORS = []
+    DISCOUNT_FACTOR = 0.999
+
     CUSTOM_INDICATORS = [
         PCT_RETURN(length=2),
         PCT_RETURN(length=12),
@@ -134,14 +121,18 @@ if __name__ == "__main__":
         RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2),
         ADX(length=16),
         RSI(length=14),
-        BINARY_SMA_RISING(length=24)
+        BINARY_SMA_RISING(length=24),
     ]
 
     yfp = YHFinanceProcessor()
 
-    val_dataset = pd.read_csv("val_stock_data.csv")
-    val_env = create_environment(yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=0.999)
-    episode_reward_vector, avg_reward = evaluate(val_env, "saved_models_tacr", "actor_best", "config_best", num_episodes=1, max_timesteps_per_episode=10000, silence=False)
+    val_stock_data = {}
+    for ticker in TICKERS:
+        val_stock_data[ticker] = pd.read_csv(os.path.join(data_dir, f"val_stock_data_{ticker}.csv"))
+
+    # Create environments
+    val_env: SimplePortfolioAllocationBaseEnv = create_environment(val_stock_data, gamma=DISCOUNT_FACTOR)
+    episode_reward_vector, avg_reward = evaluate(val_env, "saved_models_tacr", "actor_last_portfolio", "config_last_portfolio", num_episodes=1, max_timesteps_per_episode=10000, silence=False)
 
     print(f"Average reward: {avg_reward}")
 

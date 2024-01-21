@@ -4,7 +4,7 @@ import numpy as np
 from env_stocktrading.env_stocktrading import SimpleOneStockStockTradingBaseEnv
 from iRDPG.buffer import ReplayBCBuffer
 from iRDPG.irdpg import IRDPG
-from iRDPG.trainer.evaluate import evaluate
+from iRDPG.trainer.evaluate import evaluate_during_training
 from log import TensorBoardHandler
 
 
@@ -141,14 +141,11 @@ def train(agent: IRDPG, train_env: SimpleOneStockStockTradingBaseEnv, val_env: S
                 agent.save_actor("saved_models_irdpg", "actor_last")
                 agent.save_critic("saved_models_irdpg", "critic_last")
                 # Get average reward over 10 episodes
-                episode_reward_vector, avg_reward = evaluate(
+                episode_reward_vector, avg_reward = evaluate_during_training(
                     agent,
                     val_env,
-                    "saved_models_irdpg",
-                    name="actor_last",
                     num_episodes=1,
                     max_timesteps_per_episode=100000,
-                    silence=True,
                 )
                 tb_handler.log_scalar(
                     "(Val) Average Reward/episode", avg_reward, episode
@@ -169,7 +166,7 @@ def train(agent: IRDPG, train_env: SimpleOneStockStockTradingBaseEnv, val_env: S
     # Last validation step
     agent.save_actor("saved_models_irdpg", "actor_last")
     agent.save_critic("saved_models_irdpg", "critic_last")
-    episode_reward_vector, avg_reward = evaluate(
+    episode_reward_vector, avg_reward = evaluate_during_training(
         agent,
         val_env,
         "saved_models_irdpg",

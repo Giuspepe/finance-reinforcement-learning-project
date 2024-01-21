@@ -15,41 +15,49 @@ from TACR.config.config import TACRConfig
 from TACR.tacr import TACR
 from TACR.trainer.trainer import Trainer
 from TACR.trajectory.trajectory import TrajectoryGenerator
-from TACR.envs.env_stocktrading.eval_stocktrading import evaluate
-from env_stocktrading.utils import (
+from TACR.envs.env_portfolio_allocation.eval_portfolio import evaluate
+from env_stocktrading.utils_portfolio_allocation import (
     augment_data,
     create_environment,
     download_and_clean_data,
     save_data,
 )
-from TACR.envs.env_stocktrading.traj_stocktrading_generator import (
-    generate_best_trade_on_window_trajectories,
+from TACR.envs.env_portfolio_allocation.traj_portfolio_generator import (
+    generate_best_portfolio_on_window_trajectories,
 )
-
+# Import env
+from env_stocktrading.env_portfolio_allocation import SimplePortfolioAllocationBaseEnv
 from preprocessing.custom_technical_indicators import (
     RSI,
     RVI_PCT_CHANGE,
     OBV_PCT_CHANGE,
     PCT_RETURN,
     ADX,
-    RSI_CATEGORICAL,
     BINARY_SMA_RISING,
 )
 from preprocessing.process_yh_finance import YHFinanceProcessor
 
+DOW_TICKER = ['AAPL', 'AXP', 'BA', 'DD', 'DIS', 'IBM', 'INTC',
+ 'JNJ', 'JPM', 'KO', 'MSFT', 'NKE', 'PG',
+ 'UNH', 'V', 'WMT', 'XOM']
 
 if __name__ == "__main__":
+
+    # Ensure the data directory exists
+    data_dir = "data/portfolio"
+    os.makedirs(data_dir, exist_ok=True)
+
     NUM_STEPS_PER_ITERATION = 1000
     MAX_ITERATIONS = 4000
-    GENERATE_NEW_TRAJECTORIES = False
-    WARMUP_ITERATIONS = 20
-    PATIENCE_VALIDATION = 200
+    GENERATE_NEW_TRAJECTORIES = True
+    WARMUP_ITERATIONS = 1000
+    PATIENCE_VALIDATION = 50
     VALIDATION_PERIOD = 1
     TRAIN_START_DATE = "2004-01-01"
     TRAIN_END_DATE = "2018-01-01"
     VAL_START_DATE = "2018-01-01"
     VAL_END_DATE = "2024-01-01"
-    TICKERS = ["INTC"]
+    TICKERS = DOW_TICKER
     INDICATORS = []
     CUSTOM_INDICATORS = [
         PCT_RETURN(length=2),
@@ -60,46 +68,51 @@ if __name__ == "__main__":
         RSI(length=14),
         BINARY_SMA_RISING(length=24),
     ]
-    DOWNLOAD_DATA = False
+    DOWNLOAD_DATA = True
     DISCOUNT_FACTOR = 0.999
 
     yfp = YHFinanceProcessor()
+
     if DOWNLOAD_DATA:
-        train_df = download_and_clean_data(
-            yfp, TICKERS, TRAIN_START_DATE, TRAIN_END_DATE
-        )
-        train_df_aug = augment_data(
-            yfp, train_df, INDICATORS, CUSTOM_INDICATORS, vix=False
-        )
-        save_data(train_df_aug, "train_stock_data.csv")
-        val_df = download_and_clean_data(yfp, TICKERS, VAL_START_DATE, VAL_END_DATE)
-        val_df_aug = augment_data(yfp, val_df, INDICATORS, CUSTOM_INDICATORS, vix=False)
-        save_data(val_df_aug, "val_stock_data.csv")
+        # Download and clean data for all tickers
+        train_df_dict = download_and_clean_data(yfp, TICKERS, TRAIN_START_DATE, TRAIN_END_DATE)
+        val_df_dict = download_and_clean_data(yfp, TICKERS, VAL_START_DATE, VAL_END_DATE)
 
-    train_dataset = pd.read_csv("train_stock_data.csv")
-    val_dataset = pd.read_csv("val_stock_data.csv")
-    train_env = create_environment(
-        yfp, train_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=DISCOUNT_FACTOR
-    )
-    val_env = create_environment(
-        yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=DISCOUNT_FACTOR
-    )
+        # Augment data for all tickers at once
+        augmented_train_data = augment_data(yfp, train_df_dict, INDICATORS, CUSTOM_INDICATORS, vix=False)
+        augmented_val_data = augment_data(yfp, val_df_dict, INDICATORS, CUSTOM_INDICATORS, vix=False)
 
-    action_dim = train_env.action_space.n
+        # Save augmented data for each ticker
+        for ticker in TICKERS:
+            save_data(augmented_train_data[ticker], os.path.join(data_dir, f"train_stock_data_{ticker}.csv"))
+            save_data(augmented_val_data[ticker], os.path.join(data_dir, f"val_stock_data_{ticker}.csv"))
+
+    # Load stock data from CSV files into a dictionary
+    train_stock_data = {}
+    val_stock_data = {}
+    for ticker in TICKERS:
+        train_stock_data[ticker] = pd.read_csv(os.path.join(data_dir, f"train_stock_data_{ticker}.csv"))
+        val_stock_data[ticker] = pd.read_csv(os.path.join(data_dir, f"val_stock_data_{ticker}.csv"))
+
+    # Create environments
+    train_env: SimplePortfolioAllocationBaseEnv = create_environment(train_stock_data, gamma=DISCOUNT_FACTOR)
+    val_env: SimplePortfolioAllocationBaseEnv = create_environment(val_stock_data, gamma=DISCOUNT_FACTOR)
+
+    action_dim = train_env.action_space.shape[0]
 
     if GENERATE_NEW_TRAJECTORIES:
-        generate_best_trade_on_window_trajectories(env=train_env)
+        generate_best_portfolio_on_window_trajectories(env=train_env)
         print("Done generating trajectories")
     else:
         # Load trajectories from all the files
         import pickle
 
         # Best trade on window trajectories
-        with open("tacr_experiment_data/trajs_best_trade_on_window.pkl", "rb") as f:
-            trajectories_best_trade_on_window = pickle.load(f)
+        with open("tacr_experiment_data/trajs_best_portfolio_on_window.pkl", "rb") as f:
+            trajectories_best = pickle.load(f)
 
         # Concatenate all trajectories, considering that they are lists
-        trajectories = trajectories_best_trade_on_window
+        trajectories = trajectories_best
 
         train_trajectories = trajectories
 
@@ -134,13 +147,13 @@ if __name__ == "__main__":
             train_traj_states=train_states,
             train_trajectories=train_trajectories,
             action_softmax=True,
-            alpha=0.4, # Bests: 0.1 (29, 37), 0.2 (40, 41). 0.2 with 5e-6 lr for Actor and Critic (42)
-            critic_lr=5e-6, # Bests: [1e-5, 1e-5] (29) [5e-6, 5e-6] (37) - all with 0.1 alpha
-            actor_lr=5e-6,
+            alpha=0.1,
+            critic_lr=1e-5,
+            actor_lr=1e-5,
             gamma=DISCOUNT_FACTOR,
             state_mean=train_state_mean,
             state_std=train_state_std,
-            batch_size=32,
+            batch_size=64,
         )
         agent = TACR(config=tacr_config)
 
@@ -158,14 +171,14 @@ if __name__ == "__main__":
 
             # Every VALIDATION_PERIOD iterations, evaluate the agent on the environment directly, and compute the average reward
             if iter % VALIDATION_PERIOD == 0 and iter > 0:
-                trainer.agent.save_actor("saved_models_tacr", "actor_last")
-                trainer.agent.save_critic("saved_models_tacr", "critic_last")
-                trainer.agent.save_config("saved_models_tacr", "config_last")
+                trainer.agent.save_actor("saved_models_tacr", "actor_last_portfolio")
+                trainer.agent.save_critic("saved_models_tacr", "critic_last_portfolio")
+                trainer.agent.save_config("saved_models_tacr", "config_last_portfolio")
                 episode_reward_vector, avg_reward = evaluate(
                     val_env,
                     "saved_models_tacr",
-                    "actor_last",
-                    "config_last",
+                    "actor_last_portfolio",
+                    "config_last_portfolio",
                     num_episodes=1,  # We can only do 1 episode because its a fixed dataset
                     max_timesteps_per_episode=100000,
                     silence=True,
@@ -182,9 +195,9 @@ if __name__ == "__main__":
                         patience_counter = 0
                         print(f"New best model found with reward {avg_reward} at iteration {iter}")
                         # Save model
-                        trainer.agent.save_actor("saved_models_tacr", "actor_best")
-                        trainer.agent.save_critic("saved_models_tacr", "critic_best")
-                        trainer.agent.save_config("saved_models_tacr", "config_best")
+                        trainer.agent.save_actor("saved_models_tacr", "actor_best_portfolio")
+                        trainer.agent.save_critic("saved_models_tacr", "critic_best_portfolio")
+                        trainer.agent.save_config("saved_models_tacr", "config_best_portfolio")
                     else:
                         patience_counter += 1
 
@@ -198,6 +211,6 @@ if __name__ == "__main__":
                 )
 
         trainer.finish_training()
-        trainer.agent.save_actor("saved_models_tacr", "actor_last")
-        trainer.agent.save_critic("saved_models_tacr", "critic_last")
-        trainer.agent.save_config("saved_models_tacr", "config_last")
+        trainer.agent.save_actor("saved_models_tacr", "actor_last_portfolio")
+        trainer.agent.save_critic("saved_models_tacr", "critic_last_portfolio")
+        trainer.agent.save_config("saved_models_tacr", "config_last_portfolio")

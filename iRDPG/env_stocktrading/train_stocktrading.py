@@ -27,6 +27,7 @@ from env_stocktrading.utils import (
 )
 
 from preprocessing.custom_technical_indicators import (
+    RSI,
     RVI_PCT_CHANGE,
     OBV_PCT_CHANGE,
     PCT_RETURN,
@@ -45,28 +46,29 @@ def action_softmax_to_value(action: np.array) -> int:
 
 if __name__ == "__main__":
     MAX_TIMESTEPS = 1_000_000
-    VALIDATION_PERIOD = 5
+    VALIDATION_PERIOD = 2
     TRAIN_START_DATE = "2004-01-01"
     TRAIN_END_DATE = "2018-01-01"
     VAL_START_DATE = "2018-01-01"
     VAL_END_DATE = "2024-01-01"
-    TICKERS = ["OXY"]
+    TICKERS = ["INTC"]
     INDICATORS = []
     CUSTOM_INDICATORS = [
-        # RSI_CATEGORICAL(length=24),
         PCT_RETURN(length=2),
-        # OBV_PCT_CHANGE(length=8),
-        # RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2),
-        # ADX(length=16),
+        #PCT_RETURN(length=12),
+        OBV_PCT_CHANGE(length=8),
+        #RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2),
+        #ADX(length=16),
+        RSI(length=14),
         BINARY_SMA_RISING(length=24), # Can't be removed since its used as an expert action
     ]
     DOWNLOAD_DATA = False
     DISCOUNT_FACTOR = 0.999
-    PROPHETIC_ACTIONS_WINDOW_LENGTH = 10
-    BATCH_SIZE = 32
+    PROPHETIC_ACTIONS_WINDOW_LENGTH = 2
+    BATCH_SIZE = 20
     LR = 3e-4
     LAMBDA_POLICY = 0.7
-    ACTION_NOISE_DECAY_STEPS = 800_000
+    ACTION_NOISE_DECAY_STEPS = 900_000
 
 
     yfp = YHFinanceProcessor()
@@ -108,7 +110,7 @@ if __name__ == "__main__":
         observation_dim=train_env.state_dim,
         action_dim=train_env.action_dim,
         max_episode_length=train_env.max_episode_steps,
-        capacity=10_000,
+        capacity=1_000,
         batch_size=BATCH_SIZE,
     )
     train(

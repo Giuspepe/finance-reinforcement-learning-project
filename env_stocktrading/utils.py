@@ -1,6 +1,7 @@
 from typing import List
 
 import pandas as pd
+from env_stocktrading.env_portfolio_allocation import SimplePortfolioAllocationBaseEnv
 from env_stocktrading.env_stocktrading import SimpleOneStockStockTradingBaseEnv
 from preprocessing.custom_technical_indicators import TechnicalIndicator
 from preprocessing.process_yh_finance import YHFinanceProcessor
@@ -85,5 +86,5 @@ def create_environment(yfp: YHFinanceProcessor, dataset: pd.DataFrame, indicator
     """
     # Convert the DataFrame to arrays for price, technical indicators, and turbulence index
     close_array, open_array, high_array, low_array, tech_array, turbulence_array = yfp.df_to_array(dataset, indicators, custom_technical_indicators, False) 
-    return SimpleOneStockStockTradingBaseEnv(close_array=close_array, open_array=open_array, high_array=high_array, low_array=low_array, tech_array=tech_array, is_training_mode=True, discount_factor=gamma, prophetic_actions_window_length=prophetic_actions_window_length)
+    return SimpleOneStockStockTradingBaseEnv(close_array=close_array, open_array=open_array, high_array=high_array, low_array=low_array, tech_array=tech_array, discount_factor=gamma, prophetic_actions_window_length=prophetic_actions_window_length)
 

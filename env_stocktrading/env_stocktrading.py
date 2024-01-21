@@ -17,7 +17,6 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         high_array: np.ndarray = None,
         low_array: np.ndarray = None,
         tech_array: np.ndarray = None,
-        is_training_mode: bool = True,
         index_of_expert_tech_indicator: int = -1,
         prophetic_actions_window_length: int = 10,
     ):
@@ -36,7 +35,6 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         - reward_scaling (float): Scaling factor for rewards (default: 1).
         - close_array (np.ndarray): Array of stock close prices.
         - tech_array (np.ndarray): Array of technical indicators.
-        - is_training_mode (bool): Flag to indicate training mode (default: True).
         """
         super().__init__()
         self.env_name = "SimpleStockTradingBase-v0"
@@ -59,7 +57,6 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         self.buy_transaction_fee_rate = buy_transaction_fee_rate
         self.sell_transaction_fee_rate = sell_transaction_fee_rate
         self.reward_scaling = reward_scaling
-        self.is_training_mode = is_training_mode
         self.max_episode_steps = self.close_array.shape[0]
         
         self.shares_held = 0
@@ -241,7 +238,7 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         - np.ndarray: The prophetic actions for the environment.
 
         This method analyzes windows of stock prices and determines the best action to take (buy, sell, hold)
-        by generating windows of random length from 3 to 10 days and calculate the price change withing the start of the window
+        by generating windows of self.prophetic_actions_window_length and calculate the price change withing the start of the window
         and for each day in the window until the end, taking the action that maximizes the gain for any of the days and closing the
         position at the day where the gain is maximum. Then continue from the day after the position is ended and NOT at the end of the window.
         """
