@@ -12,7 +12,6 @@ parent_dir = os.path.dirname(
 )
 sys.path.append(parent_dir)
 
-import gymnasium as gym
 import numpy as np
 import pandas as pd
 from iRDPG.irdpg import IRDPG
@@ -28,11 +27,8 @@ from env_stocktrading.utils import (
 
 from preprocessing.custom_technical_indicators import (
     RSI,
-    RVI_PCT_CHANGE,
     OBV_PCT_CHANGE,
     PCT_RETURN,
-    ADX,
-    RSI_CATEGORICAL,
     BINARY_SMA_RISING,
 )
 from preprocessing.process_yh_finance import YHFinanceProcessor
@@ -55,37 +51,36 @@ if __name__ == "__main__":
     INDICATORS = []
     CUSTOM_INDICATORS = [
         PCT_RETURN(length=2),
-        #PCT_RETURN(length=12),
         OBV_PCT_CHANGE(length=8),
-        #RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2),
-        #ADX(length=16),
         RSI(length=14),
         BINARY_SMA_RISING(length=24), # Can't be removed since its used as an expert action
     ]
     DOWNLOAD_DATA = False
     DISCOUNT_FACTOR = 0.999
-    PROPHETIC_ACTIONS_WINDOW_LENGTH = 2
+    PROPHETIC_ACTIONS_WINDOW_LENGTH = 4
     BATCH_SIZE = 20
-    LR = 3e-4
-    LAMBDA_POLICY = 0.7
+    LR = 1e-5
+    LAMBDA_POLICY = 0.8
     ACTION_NOISE_DECAY_STEPS = 900_000
-
+    data_dir = "data/stocktrading"
+    os.makedirs(data_dir, exist_ok=True)
 
     yfp = YHFinanceProcessor()
     if DOWNLOAD_DATA:
         train_df = download_and_clean_data(
             yfp, TICKERS, TRAIN_START_DATE, TRAIN_END_DATE
         )
-        train_df_aug = augment_data(
-            yfp, train_df, INDICATORS, CUSTOM_INDICATORS, vix=False
-        )
-        save_data(train_df_aug, "train_stock_data.csv")
+        save_data(train_df, os.path.join(data_dir, f"train_stock_data_{TICKERS[0]}.csv"))
         val_df = download_and_clean_data(yfp, TICKERS, VAL_START_DATE, VAL_END_DATE)
-        val_df_aug = augment_data(yfp, val_df, INDICATORS, CUSTOM_INDICATORS, vix=False)
-        save_data(val_df_aug, "val_stock_data.csv")
+        save_data(val_df, os.path.join(data_dir, f"val_stock_data_{TICKERS[0]}.csv"))
 
-    train_dataset = pd.read_csv("train_stock_data.csv")
-    val_dataset = pd.read_csv("val_stock_data.csv")
+    train_dataset = pd.read_csv(os.path.join(data_dir, f"train_stock_data_{TICKERS[0]}.csv"))
+    val_dataset = pd.read_csv(os.path.join(data_dir, f"val_stock_data_{TICKERS[0]}.csv"))
+    train_dataset = augment_data(
+        yfp, train_dataset, INDICATORS, CUSTOM_INDICATORS, vix=False
+    )
+    val_dataset = augment_data(yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS, vix=False)
+
     train_env = create_environment(
         yfp, train_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=DISCOUNT_FACTOR, prophetic_actions_window_length=PROPHETIC_ACTIONS_WINDOW_LENGTH
     )

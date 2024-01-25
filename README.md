@@ -8,7 +8,10 @@ This project contains an implementation of the Recurrent Deterministic Policy Gr
 
 RDPG implementation based largely on [off-policy-continuous-control](https://github.com/zhihanyang2022/off-policy-continuous-control.git)
 
-## Todo:
-- Implement Recurrent replay buffer.
-- Test agent in gym environment.
-- Merge implementation into ElegantRL for FinRL compatibility.
+# Transformer Actor-Critic with Regularization (TACR) Implementation
+
+This project contains an implementation of the Transformer Actor-Critic with Regularization (TACR) algorithm.
+
+[TACR Paper](https://www.researchgate.net/publication/374722752_Offline_Reinforcement_Learning_for_Automated_Stock_Trading)
+
+TACR implementation based largely on [tacr](https://github.com/VarML/TACR/)

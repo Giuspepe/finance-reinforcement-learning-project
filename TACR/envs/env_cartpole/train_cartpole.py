@@ -13,10 +13,7 @@ from TACR.config.config import TACRConfig
 
 from TACR.tacr import TACR
 from TACR.trainer.trainer import Trainer
-from TACR.trajectory.trajectory import TrajectoryGenerator
-from TACR.envs.env_pendulum.eval_cartpole import evaluate
-
-from sklearn.model_selection import train_test_split
+from TACR.envs.env_cartpole.eval_cartpole import evaluate
 
 import multiprocessing
 

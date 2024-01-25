@@ -169,11 +169,8 @@ def train(agent: IRDPG, train_env: SimpleOneStockStockTradingBaseEnv, val_env: S
     episode_reward_vector, avg_reward = evaluate_during_training(
         agent,
         val_env,
-        "saved_models_irdpg",
-        name="actor_last",
         num_episodes=1,
         max_timesteps_per_episode=100000,
-        silence=True,
     )
     tb_handler.log_scalar(
         "(Val) Average Reward/episode", avg_reward, episode

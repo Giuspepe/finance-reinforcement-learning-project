@@ -106,7 +106,7 @@ def evaluate(path: str, name_actor="actor", name_config="config", num_episodes=1
     return episode_reward_vector, avg_reward
 
 if __name__ == "__main__":
-    episode_reward_vector, avg_reward = evaluate("saved_models_tacr", "actor_best", "config_best", num_episodes=100, max_timesteps_per_episode=1000, silence=False)
+    episode_reward_vector, avg_reward = evaluate("saved_models_tacr", "actor_last", "config_last", num_episodes=100, max_timesteps_per_episode=1000, silence=False)
 
 
     print(f"Average reward: {avg_reward}")

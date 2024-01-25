@@ -1,4 +1,5 @@
 from typing import List
+import numpy as np
 
 import pandas as pd
 from env_stocktrading.env_portfolio_allocation import SimplePortfolioAllocationBaseEnv
@@ -50,6 +51,8 @@ def augment_data(yfp: YHFinanceProcessor, df: pd.DataFrame, indicators: List[str
 
     # Drop rows with NaN values and reset the index
     df = df.dropna().reset_index(drop=True)
+    # Drop inf values
+    df = df.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
     
     return df
 
@@ -67,7 +70,7 @@ def save_data(df: pd.DataFrame, filename: str):
     df.to_csv(filename)
 
 
-def create_environment(yfp: YHFinanceProcessor, dataset: pd.DataFrame, indicators: List[str], custom_technical_indicators: List[TechnicalIndicator] = [], gamma: float = 0.99, prophetic_actions_window_length: int = 10):
+def create_environment(yfp: YHFinanceProcessor, dataset: pd.DataFrame, indicators: List[str], custom_technical_indicators: List[TechnicalIndicator] = [], gamma: float = 0.99, prophetic_actions_window_length: int = 10, percentage_acc_value_per_trade: float = 0.1):
     """
     Create and return a stock trading environment.
 
@@ -86,5 +89,5 @@ def create_environment(yfp: YHFinanceProcessor, dataset: pd.DataFrame, indicator
     """
     # Convert the DataFrame to arrays for price, technical indicators, and turbulence index
     close_array, open_array, high_array, low_array, tech_array, turbulence_array = yfp.df_to_array(dataset, indicators, custom_technical_indicators, False) 
-    return SimpleOneStockStockTradingBaseEnv(close_array=close_array, open_array=open_array, high_array=high_array, low_array=low_array, tech_array=tech_array, discount_factor=gamma, prophetic_actions_window_length=prophetic_actions_window_length)
+    return SimpleOneStockStockTradingBaseEnv(close_array=close_array, open_array=open_array, high_array=high_array, low_array=low_array, tech_array=tech_array, discount_factor=gamma, prophetic_actions_window_length=prophetic_actions_window_length, percentage_acc_value_per_trade=percentage_acc_value_per_trade)
 

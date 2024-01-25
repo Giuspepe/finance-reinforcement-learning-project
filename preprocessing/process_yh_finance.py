@@ -140,7 +140,10 @@ class YHFinanceProcessor:
                 ticker_df[column].fillna(method="ffill", inplace=True)
 
             ticker_df["volume"].fillna(0, inplace=True)
-            ticker_df.fillna(0, inplace=True)  # For remaining NaN values
+            ticker_df.fillna(0, inplace=True)
+            # Remove rows with 0 values for close
+            ticker_df = ticker_df[ticker_df["close"] != 0]
+        
             cleaned_data.append(ticker_df)
 
         # Rename index to 'timestamp' before concatenating

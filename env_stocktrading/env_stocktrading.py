@@ -76,6 +76,12 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
             low=-np.inf, high=np.inf, shape=(self.state_dim,), dtype=np.float32
         )
 
+        # Memory of the episode for plotting in the report - Initialize with the same amount of days as the dataset
+        self.account_value_memory = np.array([self.initial_account_value] * self.close_array.shape[0])
+        self.shares_held_memory = np.array([0] * self.close_array.shape[0])
+        self.trades_returns_memory = []
+
+
     def reset(self, *, seed: int = None, options: dict = None) -> np.ndarray:
         """
         Reset the environment to the initial state.
@@ -94,6 +100,9 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
         self.day = 0
         self.discounted_reward = 0
         self.cash_in_hand = self.account_value
+        self.account_value_memory = np.array([self.initial_account_value] * self.close_array.shape[0])
+        self.shares_held_memory = np.array([0] * self.close_array.shape[0])
+        self.trades_returns_memory = []
 
         return self.get_state(), dict()
 
@@ -116,7 +125,7 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
 
         return np.hstack((long_short_hold, indicators))
     
-    def step(self, actions: int) -> tuple:
+    def step(self, actions: int = 0, eval_mode: bool = False) -> tuple:
         """
         Perform an action in the environment.
 
@@ -141,6 +150,14 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
                     shares_to_move * self.close_array[self.day] * (1 + self.buy_transaction_fee_rate)
                 )
                 self.shares_held += shares_to_move
+
+                # Evaluate the trade return if we are in evaluation mode
+                if eval_mode:
+                    previous_account_value = self.account_value
+                    acc_val = self.cash_in_hand + self.shares_held * self.close_array[self.day]
+                    trade_return = (acc_val[0] - previous_account_value) / previous_account_value
+                    self.trades_returns_memory.append(trade_return)
+
             # Check if we are already long in the previous step, so we can't become "more" long
             elif self.shares_held > 0:
                 shares_to_move = 0
@@ -166,6 +183,14 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
                 total_volume = shares_to_move * self.close_array[self.day] * (1 - self.sell_transaction_fee_rate)
                 self.cash_in_hand += abs(total_volume)
                 self.shares_held -= abs(shares_to_move)
+
+                # Evaluate the trade return if we are in evaluation mode
+                if eval_mode:
+                    previous_account_value = self.account_value
+                    acc_val = self.cash_in_hand + self.shares_held * self.close_array[self.day]
+                    trade_return = (acc_val[0] - previous_account_value) / previous_account_value
+                    self.trades_returns_memory.append(trade_return)
+
             # Check if we are already short in the previous step, so we can't become "more" short
             elif self.shares_held < 0:
                 shares_to_move = 0
@@ -194,6 +219,11 @@ class SimpleOneStockStockTradingBaseEnv(gym.Env):
 
         # Compute discounted reward.
         self.discounted_reward = self.discounted_reward * self.discount_factor + reward
+
+        # Eval mode: Memory saving
+        if eval_mode:
+            self.account_value_memory[self.day] = self.account_value
+            self.shares_held_memory[self.day] = self.shares_held
         
         # Check if the episode is done.
         done = self.day == (self.max_episode_steps-1)

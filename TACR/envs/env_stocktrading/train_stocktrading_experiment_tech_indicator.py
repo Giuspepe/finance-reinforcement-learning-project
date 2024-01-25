@@ -1,3 +1,4 @@
+import gc
 import os
 import random
 import sys
@@ -23,8 +24,6 @@ from TACR.envs.env_stocktrading.eval_stocktrading import evaluate
 from env_stocktrading.utils import (
     augment_data,
     create_environment,
-    download_and_clean_data,
-    save_data,
 )
 from TACR.envs.env_stocktrading.traj_stocktrading_generator import (
     generate_best_trade_on_window_trajectories,
@@ -35,8 +34,21 @@ from preprocessing.custom_technical_indicators import (
     RVI_PCT_CHANGE,
     OBV_PCT_CHANGE,
     PCT_RETURN,
+    ADX,
+    BINARY_SMA_RISING,
+    VWMA_PCT_CHANGE,
+    CANDLES_PFR,
+    TRIX_PCT_CHANGE,
+    VORTEX,
+    CHOP,
+    BINARY_SMA_HIGHER_THAN_SECOND_SMA,
 )
 from preprocessing.process_yh_finance import YHFinanceProcessor
+
+
+EXPERIMENT_CUSTOM_TECHNICAL_INDICATORS = [
+    [PCT_RETURN(length=2), OBV_PCT_CHANGE(length=14), RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2), RSI(length=14), BINARY_SMA_RISING(14)], # 0
+]
 
 
 if __name__ == "__main__":
@@ -52,9 +64,8 @@ if __name__ == "__main__":
 
     NUM_STEPS_PER_ITERATION = 1000
     MAX_ITERATIONS = 4000
-    GENERATE_NEW_TRAJECTORIES = False
     WARMUP_ITERATIONS = 10
-    PATIENCE_VALIDATION = 70
+    PATIENCE_VALIDATION = 75
     VALIDATION_PERIOD = 1
     TRAIN_START_DATE = "2004-01-01"
     TRAIN_END_DATE = "2018-01-01"
@@ -62,42 +73,36 @@ if __name__ == "__main__":
     VAL_END_DATE = "2024-01-01"
     TICKERS = ["INTC"]
     INDICATORS = []
-    CUSTOM_INDICATORS = [PCT_RETURN(length=2), OBV_PCT_CHANGE(length=14), RVI_PCT_CHANGE(length=20, rvi_pct_change_length=2), RSI(length=14)]
-    DOWNLOAD_DATA = False
-    DISCOUNT_FACTOR = 0.999
-    data_dir = "data/stocktrading"
-    os.makedirs(data_dir, exist_ok=True)
+    global_best_val_metric = -float("inf")
 
-    yfp = YHFinanceProcessor()
-    if DOWNLOAD_DATA:
-        train_df = download_and_clean_data(
-            yfp, TICKERS, TRAIN_START_DATE, TRAIN_END_DATE
+    for custom_technical_indicators in EXPERIMENT_CUSTOM_TECHNICAL_INDICATORS:
+        CUSTOM_INDICATORS = custom_technical_indicators
+        DOWNLOAD_DATA = False
+        DISCOUNT_FACTOR = 0.999
+        data_dir = "data/stocktrading"
+        os.makedirs(data_dir, exist_ok=True)
+
+        yfp = YHFinanceProcessor()
+
+        train_dataset = pd.read_csv(os.path.join(data_dir, f"train_stock_data_{TICKERS[0]}.csv"))
+        val_dataset = pd.read_csv(os.path.join(data_dir, f"val_stock_data_{TICKERS[0]}.csv"))
+
+        train_dataset = augment_data(
+            yfp, train_dataset, INDICATORS, CUSTOM_INDICATORS, vix=False
         )
-        save_data(train_df, os.path.join(data_dir, f"train_stock_data_{TICKERS[0]}.csv"))
-        val_df = download_and_clean_data(yfp, TICKERS, VAL_START_DATE, VAL_END_DATE)
-        save_data(val_df, os.path.join(data_dir, f"val_stock_data_{TICKERS[0]}.csv"))
+        val_dataset = augment_data(yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS, vix=False)
 
-    train_dataset = pd.read_csv(os.path.join(data_dir, f"train_stock_data_{TICKERS[0]}.csv"))
-    val_dataset = pd.read_csv(os.path.join(data_dir, f"val_stock_data_{TICKERS[0]}.csv"))
+        train_env = create_environment(
+            yfp, train_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=DISCOUNT_FACTOR
+        )
+        val_env = create_environment(
+            yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=DISCOUNT_FACTOR
+        )
 
-    train_dataset = augment_data(
-        yfp, train_dataset, INDICATORS, CUSTOM_INDICATORS, vix=False
-    )
-    val_dataset = augment_data(yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS, vix=False)
+        action_dim = train_env.action_space.n
 
-    train_env = create_environment(
-        yfp, train_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=DISCOUNT_FACTOR
-    )
-    val_env = create_environment(
-        yfp, val_dataset, INDICATORS, CUSTOM_INDICATORS, gamma=DISCOUNT_FACTOR
-    )
-
-    action_dim = train_env.action_space.n
-
-    if GENERATE_NEW_TRAJECTORIES:
         generate_best_trade_on_window_trajectories(env=train_env)
         print("Done generating trajectories")
-    else:
         # Load trajectories from all the files
         import pickle
 
@@ -177,21 +182,19 @@ if __name__ == "__main__":
                     max_timesteps_per_episode=100000,
                     silence=True,
                 )
-
-                train_episode_reward_vector, train_avg_reward = evaluate(
-                    train_env,
-                    "saved_models_tacr",
-                    "actor_last",
-                    "config_last",
-                    num_episodes=1,  # We can only do 1 episode because its a fixed dataset
-                    max_timesteps_per_episode=100000,
-                    silence=True,
-                )
-
+                # train_episode_reward_vector, train_avg_reward = evaluate(
+                #     train_env,
+                #     "saved_models_tacr",
+                #     "actor_last",
+                #     "config_last",
+                #     num_episodes=1,  # We can only do 1 episode because its a fixed dataset
+                #     max_timesteps_per_episode=100000,
+                #     silence=True,
+                # )
                 trainer.tb.log_scalar("(Test) avg_reward", avg_reward, iter)
-                trainer.tb.log_scalar("(Train) avg_reward", train_avg_reward, iter)
+                # trainer.tb.log_scalar("(Train) avg_reward", train_avg_reward, iter)
                 print(
-                    f"Iteration {iter+1}/{MAX_ITERATIONS}, Average Actor Train Loss: {train_avg_actor_loss}, Average Reward on Eval: {avg_reward}, Average Reward on Train: {train_avg_reward}"
+                    f"Iteration {iter+1}/{MAX_ITERATIONS}, Average Actor Train Loss: {train_avg_actor_loss}, Average Reward on Eval: {avg_reward}"
                 )
 
                 # Check for improvement after warmup iterations
@@ -206,6 +209,9 @@ if __name__ == "__main__":
                         trainer.agent.save_actor("saved_models_tacr", "actor_best")
                         trainer.agent.save_critic("saved_models_tacr", "critic_best")
                         trainer.agent.save_config("saved_models_tacr", "config_best")
+                        if best_val_metric > global_best_val_metric:
+                            global_best_val_metric = best_val_metric
+                            print(f"New global best model found with reward {best_val_metric} at iteration {iter}, with custom technical indicators {custom_technical_indicators}")
                     else:
                         patience_counter += 1
 
@@ -222,4 +228,5 @@ if __name__ == "__main__":
         trainer.agent.save_actor("saved_models_tacr", "actor_last")
         trainer.agent.save_critic("saved_models_tacr", "critic_last")
         trainer.agent.save_config("saved_models_tacr", "config_last")
-
+        torch.cuda.empty_cache()
+        gc.collect()
